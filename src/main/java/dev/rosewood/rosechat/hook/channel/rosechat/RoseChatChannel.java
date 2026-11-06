@@ -20,6 +20,8 @@ import dev.rosewood.rosechat.message.tokenizer.composer.ChatComposer;
 import dev.rosewood.rosechat.message.MessageRules;
 import dev.rosewood.rosechat.message.contents.MessageContents;
 import dev.rosewood.rosechat.message.RoseMessage;
+import dev.rosewood.rosechat.placeholder.CustomPlaceholder;
+import dev.rosewood.rosechat.placeholder.condition.PlaceholderCondition;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -32,6 +34,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
+import org.bukkit.metadata.MetadataValue;
 
 public class RoseChatChannel extends ConditionalChannel implements Spyable {
 
@@ -107,16 +110,12 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
      */
     public List<Player> getVisibleAnywhereRecipients(RosePlayer sender, World world) {
         List<Player> recipients = new ArrayList<>();
-        if (world == null) {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                if (this.getReceiveCondition(sender, new RosePlayer(player)))
-                    recipients.add(player);
-            }
-        } else {
-            for (Player player : world.getPlayers()) {
-                if (this.getReceiveCondition(sender, new RosePlayer(player)))
-                    recipients.add(player);
-            }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (world != null && !world.equals(player.getWorld()))
+                continue;
+
+            if (this.getReceiveCondition(sender, new RosePlayer(player)))
+                recipients.add(player);
         }
 
         return recipients;
@@ -133,7 +132,7 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
 
         for (UUID member : this.members) {
             Player player = Bukkit.getPlayer(member);
-            if (player != null)
+            if (player != null && (world == null || world.equals(player.getWorld())))
                 recipients.add(player);
         }
 
@@ -148,19 +147,17 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
 
         if (this.radius != -1 && sender.isPlayer()) {
             Location location = sender.asPlayer().getLocation();
-            if (location.getWorld() == null)
+            World world = location.getWorld();
+            if (world == null)
                 return new HashSet<>();
 
-            if (this.visibleAnywhere) {
-                for (Player player : this.getVisibleAnywhereRecipients(sender, location.getWorld())) {
-                    if (player.getLocation().distance(location) <= this.radius)
-                        recipients.add(player);
-                }
-            } else {
-                for (Player player : this.getMemberRecipients(sender, location.getWorld())) {
-                    if (player.getLocation().distance(location) <= this.radius)
-                        recipients.add(player);
-                }
+            double radiusSq = (double) this.radius * this.radius;
+            List<Player> candidates = this.visibleAnywhere
+                    ? this.getVisibleAnywhereRecipients(sender, world)
+                    : this.getMemberRecipients(sender, world);
+            for (Player player : candidates) {
+                if (world.equals(player.getWorld()) && player.getLocation().distanceSquared(location) <= radiusSq)
+                    recipients.add(player);
             }
         } else {
             if (this.visibleAnywhere)
@@ -244,71 +241,70 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
 
     // Send To Functions
 
-    private void sendToPlayer(RoseMessage message, RosePlayer receiver, MessageDirection direction,
-                              String format, String discordId) {
-        // Don't send the message if the receiver can't receive it.
-        if (!this.canPlayerReceiveMessage(message.getSender(), receiver))
-            return;
+    private boolean isPlayerVisibleTo(Player viewer, Player target) {
+        if (viewer == null || target == null)
+            return false;
+        if (!viewer.canSee(target))
+            return false;
+        for (MetadataValue meta : target.getMetadata("vanished")) {
+            if (meta.asBoolean())
+                return false;
+        }
+        return true;
+    }
 
-        // Send the message to the player asynchronously.
-        RoseChat.MESSAGE_THREAD_POOL.execute(() -> {
-            MessageOutputs outputs;
+    private boolean canReuseParsedMessage(RoseMessage message, String format) {
+        if (format == null || message.getSender().isConsole())
+            return false;
 
-            // If the message is a JSON message, parse it before sending.
-            if (direction == MessageDirection.SERVER_TO_SERVER_RAW) {
-                String jsonMessage = MessageUtils.applyJSONPlaceholders(message.getPlayerInput());
-                MessageContents parsedMessage = MessageUtils.parseJSONMessage(receiver, jsonMessage);
+        if (PreParseMessageEvent.getHandlerList().getRegisteredListeners().length > 0
+                || PostParseMessageEvent.getHandlerList().getRegisteredListeners().length > 0)
+            return false;
 
-                PostParseMessageEvent event = new PostParseMessageEvent(message, receiver,
-                        MessageDirection.SERVER_TO_SERVER_RAW, parsedMessage);
-                Bukkit.getPluginManager().callEvent(event);
+        String input = message.getPlayerInput();
+        if (input != null && (input.contains("%other_") || input.contains("%rel_")))
+            return false;
 
-                if (event.isCancelled())
-                    return;
+        if (format.contains("%other_") || format.contains("%rel_"))
+            return false;
 
-                parsedMessage = event.getContents();
-                outputs = event.getContents().outputs();
-
-                receiver.send(parsedMessage);
-                if (receiver.getPlayerData() != null)
-                    receiver.getPlayerData().getMessageLog().addDeletableMessage(
-                            new DeletableMessage(message.getUUID(), ChatComposer.json().composeBungee(parsedMessage.buildComponents()),
-                                    false, null, this.getId()));
-
-                Bukkit.getPluginManager().callEvent(new MessageReceivedEvent(message, parsedMessage, receiver));
-            } else {
-                PreParseMessageEvent preParseEvent = new PreParseMessageEvent(message, receiver, direction);
-                Bukkit.getPluginManager().callEvent(preParseEvent);
-
-                if (preParseEvent.isCancelled())
-                    return;
-
-                MessageContents components = discordId == null ?
-                        message.parse(receiver, format) : message.parseMessageFromDiscord(receiver, format, discordId);
-
-                PostParseMessageEvent postParseEvent = new PostParseMessageEvent(message, receiver, direction, components);
-                Bukkit.getPluginManager().callEvent(postParseEvent);
-
-                if (postParseEvent.isCancelled())
-                    return;
-
-                outputs = postParseEvent.getContents().outputs();
-
-                receiver.send(postParseEvent.getContents());
-
-                DeletableMessage deletableMessage = message.createDeletableMessage(
-                        postParseEvent.getContents().build(ChatComposer.json()), discordId);
-
-                if (receiver.getPlayerData() != null)
-                    receiver.getPlayerData().getMessageLog().addDeletableMessage(deletableMessage);
-
-                Bukkit.getPluginManager().callEvent(new MessageReceivedEvent(message, components, receiver));
+        for (CustomPlaceholder placeholder : RoseChatAPI.getInstance().getPlaceholderManager().getPlaceholders().values()) {
+            for (PlaceholderCondition condition : placeholder.getPlaceholders().values()) {
+                String cond = condition.getCondition();
+                if (cond != null && (cond.contains("%other_") || cond.contains("%rel_")))
+                    return false;
+                for (List<String> list : condition.getValues().values()) {
+                    for (String val : list) {
+                        if (val != null && (val.contains("%other_") || val.contains("%rel_")))
+                            return false;
+                    }
+                }
             }
+        }
 
-            if (outputs.getMessage() != null)
-                receiver.send(outputs.getMessage());
+        return true;
+    }
 
-            if (message.getSender().getUUID() != null && message.getSender().getUUID().equals(receiver.getUUID())) {
+    private void deliverParsedToReceiver(RoseMessage message, RosePlayer receiver, MessageContents contents,
+                                         String deletableJson, boolean rawJsonMode, String discordId) {
+        MessageOutputs outputs = contents.outputs();
+
+        receiver.send(contents);
+
+        if (Settings.ENABLE_DELETING_MESSAGES.get() && receiver.getPlayerData() != null && deletableJson != null) {
+            DeletableMessage deletableMessage = rawJsonMode
+                    ? new DeletableMessage(message.getUUID(), deletableJson, false, null, this.getId())
+                    : message.createDeletableMessage(deletableJson, discordId);
+            receiver.getPlayerData().getMessageLog().addDeletableMessage(deletableMessage);
+        }
+
+        Bukkit.getPluginManager().callEvent(new MessageReceivedEvent(message, contents, receiver));
+
+        if (outputs.getMessage() != null)
+            receiver.send(outputs.getMessage());
+
+        if (message.getSender().getUUID() != null && message.getSender().getUUID().equals(receiver.getUUID())) {
+            if (!outputs.getServerCommands().isEmpty() || !outputs.getPlayerCommands().isEmpty()) {
                 Bukkit.getScheduler().runTask(RoseChat.getInstance(), () -> {
                     for (String command : outputs.getServerCommands())
                         Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
@@ -319,19 +315,80 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
                                 command.replace("%player%", message.getSender().getRealName()));
                 });
             }
+        }
 
-            if (!receiver.isPlayer())
-                return;
+        if (!receiver.isPlayer())
+            return;
 
-            if (!outputs.getTaggedPlayers().contains(receiver.getUUID()))
-                return;
+        if (!outputs.getTaggedPlayers().contains(receiver.getUUID()))
+            return;
 
-            if ((receiver.getPlayerData() != null && !receiver.getPlayerData().hasTagSounds()) || outputs.getSound() == null)
-                return;
+        if ((receiver.getPlayerData() != null && !receiver.getPlayerData().hasTagSounds()) || outputs.getSound() == null)
+            return;
 
-            Player player = receiver.asPlayer();
-            player.playSound(player.getLocation(), outputs.getSound(), 1.0f, 1.0f);
-        });
+        Player player = receiver.asPlayer();
+        player.playSound(player.getLocation(), outputs.getSound(), 1.0f, 1.0f);
+    }
+
+    private void deliverToBatch(RoseMessage message, List<RosePlayer> recipients, MessageDirection direction,
+                                String format, String discordId) {
+        if (recipients.isEmpty())
+            return;
+
+        boolean enableDeleting = Settings.ENABLE_DELETING_MESSAGES.get();
+
+        if (direction != MessageDirection.SERVER_TO_SERVER_RAW && this.canReuseParsedMessage(message, format)) {
+            RosePlayer parseTarget = message.getSender().isPlayer() ? message.getSender() : recipients.get(0);
+            MessageContents sharedContents = discordId == null
+                    ? message.parse(parseTarget, format)
+                    : message.parseMessageFromDiscord(parseTarget, format, discordId);
+            String sharedJson = enableDeleting ? sharedContents.build(ChatComposer.json()) : null;
+
+            for (RosePlayer receiver : recipients) {
+                this.deliverParsedToReceiver(message, receiver, sharedContents, sharedJson, false, discordId);
+            }
+            return;
+        }
+
+        for (RosePlayer receiver : recipients) {
+            if (direction == MessageDirection.SERVER_TO_SERVER_RAW) {
+                String jsonMessage = MessageUtils.applyJSONPlaceholders(message.getPlayerInput());
+                MessageContents parsedMessage = MessageUtils.parseJSONMessage(receiver, jsonMessage);
+
+                PostParseMessageEvent event = new PostParseMessageEvent(message, receiver,
+                        MessageDirection.SERVER_TO_SERVER_RAW, parsedMessage);
+                Bukkit.getPluginManager().callEvent(event);
+
+                if (event.isCancelled())
+                    continue;
+
+                parsedMessage = event.getContents();
+                String deletableJson = enableDeleting
+                        ? ChatComposer.json().composeBungee(parsedMessage.buildComponents())
+                        : null;
+                this.deliverParsedToReceiver(message, receiver, parsedMessage, deletableJson, true, discordId);
+            } else {
+                PreParseMessageEvent preParseEvent = new PreParseMessageEvent(message, receiver, direction);
+                Bukkit.getPluginManager().callEvent(preParseEvent);
+
+                if (preParseEvent.isCancelled())
+                    continue;
+
+                MessageContents components = discordId == null
+                        ? message.parse(receiver, format)
+                        : message.parseMessageFromDiscord(receiver, format, discordId);
+
+                PostParseMessageEvent postParseEvent = new PostParseMessageEvent(message, receiver, direction, components);
+                Bukkit.getPluginManager().callEvent(postParseEvent);
+
+                if (postParseEvent.isCancelled())
+                    continue;
+
+                MessageContents finalContents = postParseEvent.getContents();
+                String deletableJson = enableDeleting ? finalContents.build(ChatComposer.json()) : null;
+                this.deliverParsedToReceiver(message, receiver, finalContents, deletableJson, false, discordId);
+            }
+        }
     }
 
     private void sendToDiscord(RoseMessage message, MessageDirection direction) {
@@ -402,78 +459,81 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         Bukkit.getPluginManager().callEvent(new MessageReceivedEvent(message, components, console));
     }
 
-    private void sendToVisibleAnywhere(RoseMessage message, MessageDirection direction, String format, String discordId) {
+    private boolean collectVisibleAnywhereRecipients(RoseMessage message, List<RosePlayer> regularRecipients, List<RosePlayer> spyRecipients) {
         RosePlayer sender = message.getSender();
+        boolean heardByOtherPlayer = false;
 
-        // If this channel is visible anywhere and has a radius,
-        // it should send the message to players in the radius without them joining.
-        // Radius messages can only be sent by players.
         if (this.radius != -1 && sender.isPlayer()) {
             Location location = sender.asPlayer().getLocation();
-            if (location.getWorld() == null)
-                return;
+            World world = location.getWorld();
+            if (world == null)
+                return false;
 
-            // Loop through all the players in the world and check if they are within distance.
-            for (Player player : this.getVisibleAnywhereRecipients(sender, location.getWorld())) {
-                // Avoid sending the message to the sender.
-                if (sender.isPlayer() && sender.getUUID().equals(player.getUniqueId()))
+            double radiusSq = (double) this.radius * this.radius;
+            for (Player player : this.getVisibleAnywhereRecipients(sender, world)) {
+                if (sender.getUUID().equals(player.getUniqueId()))
                     continue;
 
-                // Send the message if the player is in distance.
-                if (player.getLocation().distance(location) <= this.radius)
-                    this.sendToPlayer(message, new RosePlayer(player), direction, format, discordId);
+                if (world.equals(player.getWorld()) && player.getLocation().distanceSquared(location) <= radiusSq) {
+                    RosePlayer rp = new RosePlayer(player);
+                    if (this.canPlayerReceiveMessage(sender, rp)) {
+                        regularRecipients.add(rp);
+                        if (this.isPlayerVisibleTo(sender.asPlayer(), player))
+                            heardByOtherPlayer = true;
+                    }
+                }
             }
 
-            // Allow spies who are not in the same world to see the message.
             Predicate<Player> condition = player ->
-                    !player.getWorld().getName().equals(location.getWorld().getName())
-                            || (player.getWorld().getName().equals(location.getWorld().getName())
-                                && player.getLocation().distance(location) >= this.radius);
-            this.sendToSpies(condition, message, direction);
-            return;
+                    !world.equals(player.getWorld()) || player.getLocation().distanceSquared(location) > radiusSq;
+            this.collectSpies(condition, message, spyRecipients);
+            return heardByOtherPlayer;
         }
 
-        // If radius is not enabled, send to all players.
-        for (Player player : this.getVisibleAnywhereRecipients(message.getSender(), null)) {
-            // Avoid sending the message to the sender.
+        for (Player player : this.getVisibleAnywhereRecipients(sender, null)) {
             if (sender.isPlayer() && sender.getUUID().equals(player.getUniqueId()))
                 continue;
 
-            this.sendToPlayer(message, new RosePlayer(player), direction, format, discordId);
+            RosePlayer rp = new RosePlayer(player);
+            if (this.canPlayerReceiveMessage(sender, rp))
+                regularRecipients.add(rp);
         }
 
-        this.sendToSpies(null, message, direction);
+        this.collectSpies(null, message, spyRecipients);
+        return true;
     }
 
-    private void sendToChannelMembers(RoseMessage message, MessageDirection direction, String format, String discordId) {
+    private boolean collectChannelMemberRecipients(RoseMessage message, List<RosePlayer> regularRecipients, List<RosePlayer> spyRecipients) {
         RosePlayer sender = message.getSender();
+        boolean heardByOtherPlayer = false;
 
-        // Send the message to all the channel members in the radius.
         if (this.radius != -1 && sender.isPlayer()) {
             Location location = sender.asPlayer().getLocation();
-            if (location.getWorld() == null)
-                return;
+            World world = location.getWorld();
+            if (world == null)
+                return false;
 
-            for (Player player : this.getMemberRecipients(sender, null)) {
-                if (sender.isPlayer() && sender.getUUID().equals(player.getUniqueId()))
+            double radiusSq = (double) this.radius * this.radius;
+            for (Player player : this.getMemberRecipients(sender, world)) {
+                if (sender.getUUID().equals(player.getUniqueId()))
                     continue;
 
-                if (!player.getWorld().getName().equals(location.getWorld().getName()))
-                    continue;
-
-                if (player.getLocation().distance(location) <= this.radius)
-                    this.sendToPlayer(message, new RosePlayer(player), direction, format, discordId);
+                if (world.equals(player.getWorld()) && player.getLocation().distanceSquared(location) <= radiusSq) {
+                    RosePlayer rp = new RosePlayer(player);
+                    if (this.canPlayerReceiveMessage(sender, rp)) {
+                        regularRecipients.add(rp);
+                        if (this.isPlayerVisibleTo(sender.asPlayer(), player))
+                            heardByOtherPlayer = true;
+                    }
+                }
             }
 
-            // Allow spies who are not in the same world to see the message.
             Predicate<Player> condition = player -> !this.members.contains(player.getUniqueId())
-                    || (this.members.contains(player.getUniqueId()) &&
-                            (!player.getWorld().getName().equals(location.getWorld().getName())
-                            || (player.getWorld().getName().equals(location.getWorld().getName())
-                                    && player.getLocation().distance(location) > this.radius)));
-            this.sendToSpies(condition, message, direction);
+                    || !world.equals(player.getWorld())
+                    || player.getLocation().distanceSquared(location) > radiusSq;
+            this.collectSpies(condition, message, spyRecipients);
+            return heardByOtherPlayer;
         } else if (!this.worlds.isEmpty()) {
-            // The player must be in the channel and a world to receive the message.
             for (Player player : this.getMemberRecipients(sender, null)) {
                 if (sender.isPlayer() && sender.getUUID().equals(player.getUniqueId()))
                     continue;
@@ -481,44 +541,50 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
                 if (!this.worlds.contains(player.getWorld().getName()))
                     continue;
 
-                this.sendToPlayer(message, new RosePlayer(player), direction, format, discordId);
+                RosePlayer rp = new RosePlayer(player);
+                if (this.canPlayerReceiveMessage(sender, rp))
+                    regularRecipients.add(rp);
             }
 
             Predicate<Player> condition = player -> !this.members.contains(player.getUniqueId())
-                    || (this.members.contains(player.getUniqueId())
-                    && !this.worlds.contains(player.getWorld().getName()));
-            this.sendToSpies(condition, message, direction);
+                    || !this.worlds.contains(player.getWorld().getName());
+            this.collectSpies(condition, message, spyRecipients);
+            return true;
         } else {
-            // No other conditions to worry about, send directly to all members.
             for (Player player : this.getMemberRecipients(sender, null)) {
                 if (sender.isPlayer() && sender.getUUID().equals(player.getUniqueId()))
                     continue;
 
-                this.sendToPlayer(message, new RosePlayer(player), direction, format, discordId);
+                RosePlayer rp = new RosePlayer(player);
+                if (this.canPlayerReceiveMessage(sender, rp))
+                    regularRecipients.add(rp);
             }
 
             Predicate<Player> condition = player -> !this.members.contains(player.getUniqueId());
-            this.sendToSpies(condition, message, direction);
+            this.collectSpies(condition, message, spyRecipients);
+            return true;
         }
     }
 
-    private void sendToSpies(Predicate<Player> condition, RoseMessage message, MessageDirection direction) {
+    private void collectSpies(Predicate<Player> condition, RoseMessage message, List<RosePlayer> spyRecipients) {
         List<Player> spies = this.getSpies(condition);
+        RosePlayer sender = message.getSender();
         for (Player spy : spies) {
             if (spy == null)
                 continue;
 
-            if (this.members.contains(spy.getUniqueId()))
+            if (condition == null && this.members.contains(spy.getUniqueId()))
                 continue;
 
-            if (new RosePlayer(spy).getChannel() == this)
+            RosePlayer spyPlayer = new RosePlayer(spy);
+            if (this.radius == -1 && spyPlayer.getChannel() == this)
                 continue;
 
-            // Avoid sending the message to the sender.
-            if (message.getSender().getUUID() != null && message.getSender().getUUID().equals(spy.getUniqueId()))
+            if (sender.getUUID() != null && sender.getUUID().equals(spy.getUniqueId()))
                 continue;
 
-            this.sendToPlayer(message, new RosePlayer(spy), direction, Settings.CHANNEL_SPY_FORMAT.get(), null);
+            if (this.canPlayerReceiveMessage(sender, spyPlayer))
+                spyRecipients.add(spyPlayer);
         }
     }
 
@@ -529,21 +595,47 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         // Send the message to the console if it should be sent in chat.
         this.sendToConsole(message, direction, format, options.discordId());
 
-        // Send the message to the person who sent it.
-        this.sendToPlayer(message, message.getSender(), direction, format, options.discordId());
-
         // Disable spam filter for further messages.
         rules.ignoreMessageLogging();
 
         this.sendToDiscord(message, direction);
         this.sendToBungee(message, direction);
 
-        // Send to all visible anywhere recipients.
-        if (this.visibleAnywhere) {
-           this.sendToVisibleAnywhere(message, direction, format, options.discordId());
-        } else {
-            this.sendToChannelMembers(message, direction, format, options.discordId());
-        }
+        List<RosePlayer> regularRecipients = new ArrayList<>();
+        List<RosePlayer> spyRecipients = new ArrayList<>();
+
+        RosePlayer sender = message.getSender();
+        if (this.canPlayerReceiveMessage(sender, sender))
+            regularRecipients.add(sender);
+
+        boolean heardByOtherPlayer = this.visibleAnywhere
+                ? this.collectVisibleAnywhereRecipients(message, regularRecipients, spyRecipients)
+                : this.collectChannelMemberRecipients(message, regularRecipients, spyRecipients);
+
+        boolean notifyEmptyRadius = this.radius != -1
+                && sender.isPlayer()
+                && direction == MessageDirection.PLAYER_TO_SERVER
+                && !heardByOtherPlayer
+                && Settings.WARN_ON_EMPTY_RADIUS_CHANNEL.get();
+
+        String discordId = options.discordId();
+        RoseChat.MESSAGE_THREAD_POOL.execute(() -> {
+            this.deliverToBatch(message, regularRecipients, direction, format, discordId);
+
+            if (notifyEmptyRadius) {
+                LocaleManager localeManager = RoseChatAPI.getInstance().getLocaleManager();
+                String rawWarning = localeManager.getMessageOrDefault("empty-radius-channel",
+                        "<#8E99A2>&oNobody is close enough to hear you. Use <#55FFFF>/g<#8E99A2>&o for Global chat.");
+                if (!rawWarning.isEmpty()) {
+                    RosePlayer consoleSender = new RosePlayer(Bukkit.getConsoleSender());
+                    sender.send(RoseChatAPI.getInstance().parse(consoleSender, sender, rawWarning));
+                }
+            }
+
+            if (!spyRecipients.isEmpty()) {
+                this.deliverToBatch(message, spyRecipients, direction, Settings.CHANNEL_SPY_FORMAT.get(), null);
+            }
+        });
     }
 
     // Send String Functions
@@ -578,17 +670,14 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
      * @param message The message to send.
      */
     private void sendStringToWorlds(String message) {
-        for (String worldStr : this.worlds) {
-            World world = Bukkit.getWorld(worldStr);
-            if (world == null)
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!this.worlds.contains(player.getWorld().getName()))
                 continue;
 
-            for (Player player : world.getPlayers()) {
-                if (!player.hasPermission("rosechat.channel." + this.getId()))
-                    continue;
+            if (!player.hasPermission("rosechat.channel." + this.getId()))
+                continue;
 
-                player.sendMessage(message);
-            }
+            player.sendMessage(message);
         }
     }
 

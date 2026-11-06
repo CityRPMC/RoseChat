@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.apache.commons.text.WordUtils;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -84,10 +86,12 @@ public class HeldItemTokenizer extends Tokenizer {
                 continue;
 
             int amount = itemStack.getAmount();
-            String json = itemMeta.getAsString();
+            String json = !NMSUtil.isPaper() || replacement.contains("%item%") ? itemMeta.getAsString() : "";
 
             String itemName;
-            if (itemMeta.hasDisplayName()) {
+            if (NMSUtil.isPaper()) {
+                itemName = PaperItemHelper.getItemName(itemStack, itemMeta);
+            } else if (itemMeta.hasDisplayName()) {
                 itemName = itemMeta.getDisplayName();
             } else if (NMSUtil.getVersionNumber() >= 21 && itemMeta.hasItemName()) {
                 itemName = itemMeta.getItemName();
@@ -106,6 +110,27 @@ public class HeldItemTokenizer extends Tokenizer {
                     .encapsulate()
                     .build(), start, match.length()));
         }
+    }
+
+    private static final class PaperItemHelper {
+
+        private static final LegacyComponentSerializer SERIALIZER = LegacyComponentSerializer.builder()
+                .character('&')
+                .hexColors()
+                .build();
+
+        private static String getItemName(ItemStack itemStack, ItemMeta itemMeta) {
+            if (itemMeta.hasDisplayName()) {
+                Component displayName = itemMeta.displayName();
+                if (displayName != null)
+                    return SERIALIZER.serialize(displayName);
+            }
+            if (NMSUtil.getVersionNumber() >= 21 && itemMeta.hasItemName()) {
+                return itemMeta.getItemName();
+            }
+            return WordUtils.capitalize(itemStack.getType().name().toLowerCase().replace("_", " "));
+        }
+
     }
 
 }

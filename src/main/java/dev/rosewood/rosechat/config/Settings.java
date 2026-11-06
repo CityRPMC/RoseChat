@@ -83,7 +83,7 @@ public final class Settings implements SettingHolder {
             "Should multiple players be allowed to use the same nickname?");
 
     public static final RoseSetting<ConfigurationSection> CHAT_SETTINGS = create("chat-settings", "General Miscellaneous Settings");
-    public static final RoseSetting<EventPriority> CHAT_EVENT_PRIORITY = create(CHAT_SETTINGS, "chat-event-priority", EVENT_PRIORITY, EventPriority.LOW,
+    public static final RoseSetting<EventPriority> CHAT_EVENT_PRIORITY = create(CHAT_SETTINGS, "chat-event-priority", EVENT_PRIORITY, EventPriority.HIGH,
             "The event priority for the chat listener.",
                         "This may need to be changed if another plugin does something with chat.",
                         "Valid Options: LOWEST, LOW, NORMAL, HIGH, HIGHEST");
@@ -160,6 +160,10 @@ public final class Settings implements SettingHolder {
                         "Requires a server restart to change, set to 0 to disable.");
     public static final RoseSetting<Boolean> ALLOW_MESSAGING_VANISHED_PLAYERS = create(CHAT_SETTINGS, "allow-messaging-vanished-players", BOOLEAN, true,
             "Can players be messaged when they are vanished?");
+    public static final RoseSetting<Boolean> WARN_ON_EMPTY_RADIUS_CHANNEL = create(CHAT_SETTINGS, "warn-on-empty-radius-channel", BOOLEAN, true,
+            "Should players be notified when they send a message in a radius channel (e.g. local) and nobody is nearby to hear them?");
+    public static final RoseSetting<Boolean> SHOW_CHANNEL_ACTIONBAR = create(CHAT_SETTINGS, "show-channel-actionbar", BOOLEAN, true,
+            "Should an actionbar indicator be shown when a player switches chat channels?");
 
     public static final RoseSetting<ConfigurationSection> DISCORD_SETTINGS = create("discord-settings", "Discord Settings", "Requires DiscordSRV");
     public static final RoseSetting<Boolean> USE_DISCORD = create(DISCORD_SETTINGS, "use-discord", BOOLEAN, true,

@@ -129,6 +129,10 @@ public abstract class MessageContents {
             receiver.sendMessage(MessageContents.this.build(ChatComposer.adventure().decorated()));
         }
 
+        public void sendActionBar(Player receiver) {
+            receiver.sendActionBar(MessageContents.this.build(ChatComposer.adventure().decorated()));
+        }
+
         public void setDisplayName(Player player) {
             player.displayName(MessageContents.this.build(ChatComposer.adventure().decorated()));
         }
@@ -158,6 +162,14 @@ public abstract class MessageContents {
             this.withAdventure().sendMessage(receiver);
         } else {
             receiver.spigot().sendMessage(this.build(ChatComposer.decorated()));
+        }
+    }
+
+    public void sendActionBar(Player receiver) {
+        if (NMSUtil.isPaper()) {
+            this.withAdventure().sendActionBar(receiver);
+        } else {
+            receiver.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, this.build(ChatComposer.decorated()));
         }
     }
 

@@ -94,7 +94,8 @@ public class PlaceholderCondition {
 
         if (PlaceholderAPIHook.enabled()) {
             placeholder = placeholders.apply(placeholder);
-            placeholder = PlaceholderAPIHook.applyRelationalPlaceholders(player, player2, placeholder);
+            if (placeholder.contains("%rel_"))
+                placeholder = PlaceholderAPIHook.applyRelationalPlaceholders(player, player2, placeholder);
             return PlaceholderAPIHook.applyPlaceholders(player, placeholder);
         } else
             return placeholders.apply(placeholder);

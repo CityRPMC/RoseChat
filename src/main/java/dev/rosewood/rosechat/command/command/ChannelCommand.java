@@ -53,10 +53,6 @@ public class ChannelCommand extends RoseChatCommand {
             return;
         }
 
-        // Move the player to the default channel if they're attempting to switch to the channel they're in.
-        if (channel.getId().equals(player.getPlayerData().getCurrentChannel().getId()))
-            channel = this.getAPI().getDefaultChannel();
-
         boolean success = player.switchChannel(channel, channel instanceof GroupChannel);
         if (!success)
             return;

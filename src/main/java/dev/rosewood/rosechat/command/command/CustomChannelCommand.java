@@ -44,14 +44,16 @@ public class CustomChannelCommand extends Command {
                     return false;
                 }
 
-                // Move the player to the default channel if they're attempting to switch to the channel they're in.
-                if (channel.getId().equals(player.getPlayerData().getCurrentChannel().getId()))
-                    channel = api.getDefaultChannel();
+                boolean success = player.switchChannel(channel);
+                if (!success)
+                    return true;
 
-                player.switchChannel(channel);
-
-                player.sendLocaleMessage("command-channel-joined",
-                        StringPlaceholders.of("id", channel.getId()));
+                String joinMessage = channel.getSettings().getFormats().get("join-message");
+                if (joinMessage != null)
+                    player.send(api.parse(player, player, joinMessage));
+                else
+                    player.sendLocaleMessage("command-channel-joined",
+                            StringPlaceholders.of("id", channel.getId()));
                 return true;
             }
 

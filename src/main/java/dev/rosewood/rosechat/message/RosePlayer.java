@@ -523,6 +523,15 @@ public class RosePlayer {
         }
     }
 
+    /**
+     * Sends an actionbar message to the RosePlayer.
+     * @param message The message to send.
+     */
+    public void sendActionBar(MessageContents message) {
+        if (this.isPlayer() && message != null)
+            message.sendActionBar(this.asPlayer());
+    }
+
     private void logToConsole(String message) {
         RoseChat plugin = RoseChat.getInstance();
         if (plugin.getConsoleLog() == null)
@@ -586,6 +595,15 @@ public class RosePlayer {
         this.getPlayerData().setCurrentChannel(channel);
         this.getPlayerData().setIsInGroupChannel(isGroupChannel);
         this.getPlayerData().save();
+
+        Player bukkitPlayer = this.asPlayer();
+        if (bukkitPlayer != null && bukkitPlayer.isOnline() && Settings.SHOW_CHANNEL_ACTIONBAR.get()) {
+            String rawFormat = this.api.getLocaleManager().getMessageOrDefault("command-channel-actionbar", "<#8E99A2>Active Channel: &b%id%");
+            if (!rawFormat.isEmpty()) {
+                String formatted = StringPlaceholders.of("id", channel.getId()).apply(rawFormat);
+                RoseChat.MESSAGE_THREAD_POOL.execute(() -> this.sendActionBar(this.api.parse(this, this, formatted)));
+            }
+        }
 
         return true;
     }
@@ -732,6 +750,13 @@ public class RosePlayer {
      */
     public Player asPlayer() {
         return this.isPlayer() ? this.offlinePlayer.getPlayer() : null;
+    }
+
+    /**
+     * @return The OfflinePlayer from the RosePlayer, or null if console/proxy.
+     */
+    public OfflinePlayer asOfflinePlayer() {
+        return this.offlinePlayer;
     }
 
     /**

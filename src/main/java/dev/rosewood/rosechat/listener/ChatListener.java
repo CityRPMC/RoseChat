@@ -23,7 +23,7 @@ public class ChatListener implements Listener {
         this.api = RoseChatAPI.getInstance();
     }
 
-    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onChat(AsyncPlayerChatEvent event) {
         event.setCancelled(true);
 

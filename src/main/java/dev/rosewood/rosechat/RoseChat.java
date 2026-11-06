@@ -5,17 +5,8 @@ import dev.rosewood.rosechat.chat.log.ConsoleMessageLog;
 import dev.rosewood.rosechat.chat.task.ChatLogTask;
 import dev.rosewood.rosechat.config.Settings;
 import dev.rosewood.rosechat.hook.RoseChatPlaceholderExpansion;
-import dev.rosewood.rosechat.hook.channel.bentobox.BentoBoxChannelProvider;
-import dev.rosewood.rosechat.hook.channel.fabledskyblock.FabledSkyblockChannelProvider;
-import dev.rosewood.rosechat.hook.channel.factionsuuid.FactionsUUIDChannelProvider;
-import dev.rosewood.rosechat.hook.channel.husktowns.HuskTownsChannelProvider;
-import dev.rosewood.rosechat.hook.channel.kingdomsx.KingdomsXChannelProvider;
 import dev.rosewood.rosechat.hook.channel.marriagemaster.MarriageMasterChannelProvider;
-import dev.rosewood.rosechat.hook.channel.mcmmo.McMMOChannelProvider;
 import dev.rosewood.rosechat.hook.channel.rosechat.RoseChatChannelProvider;
-import dev.rosewood.rosechat.hook.channel.simpleclans.SimpleClansChannelProvider;
-import dev.rosewood.rosechat.hook.channel.superiorskyblock.SuperiorSkyblockChannelProvider;
-import dev.rosewood.rosechat.hook.channel.towny.TownyChannelProvider;
 import dev.rosewood.rosechat.hook.channel.worldguard.WorldGuardChannelProvider;
 import dev.rosewood.rosechat.hook.discord.DiscordChatProvider;
 import dev.rosewood.rosechat.hook.discord.DiscordSRVProvider;
@@ -219,38 +210,11 @@ public class RoseChat extends RosePlugin {
     public void registerChannelHooks(PluginManager pluginManager) {
         new RoseChatChannelProvider().register();
 
-        if (pluginManager.getPlugin("Towny") != null)
-            new TownyChannelProvider().register();
-
-        if (pluginManager.getPlugin("mcMMO") != null)
-            new McMMOChannelProvider().register();
-
         if (pluginManager.getPlugin("WorldGuard") != null)
             new WorldGuardChannelProvider().register();
 
-        if (pluginManager.getPlugin("SimpleClans") != null)
-            new SimpleClansChannelProvider().register();
-
-        if (pluginManager.getPlugin("Factions") != null)
-            new FactionsUUIDChannelProvider().register();
-
-        if (pluginManager.getPlugin("Kingdoms") != null)
-            new KingdomsXChannelProvider().register();
-
-        if (pluginManager.getPlugin("BentoBox") != null)
-            new BentoBoxChannelProvider().register();
-
-        if (pluginManager.getPlugin("SuperiorSkyblock2") != null)
-            new SuperiorSkyblockChannelProvider().register();
-
-        if (pluginManager.getPlugin("FabledSkyblock") != null)
-            new FabledSkyblockChannelProvider().register();
-
         if (pluginManager.getPlugin("MarriageMaster") != null)
             new MarriageMasterChannelProvider().register();
-
-        if (pluginManager.getPlugin("HuskTowns") != null)
-            new HuskTownsChannelProvider().register();
     }
 
     public Permission getVault() {

@@ -198,16 +198,11 @@ public class PlayerListener implements Listener {
                         return;
                     }
 
-                    if (channel.getId().equals(player.getPlayerData().getCurrentChannel().getId()))
-                        channel = RoseChatAPI.getInstance().getDefaultChannel();
-
                     // If the message was the same, join the channel.
                     if (input.equalsIgnoreCase("/" + command)) {
                         boolean success = player.switchChannel(channel, channel instanceof GroupChannel);
                         if (!success)
                             return;
-
-                        player.switchChannel(channel);
 
                         String joinMessage = channel.getSettings().getFormats().get("join-message");
                         if (joinMessage != null)
