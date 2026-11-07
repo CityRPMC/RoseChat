@@ -66,34 +66,61 @@ public class GroupChannel extends Channel {
 
         String format = options.format() != null ? options.format() : this.getSettings().getFormats().get("chat");
 
+        if (options.sender().isPlayer() && options.sender().getPlayerData() != null)
+            options.sender().getPlayerData().setLastGroupChatId(this.id);
+
         // Get all the members as RosePlayers and add the console.
-        List<RosePlayer> members = this.getMembers().stream()
-                .map(Bukkit::getPlayer).filter(Objects::nonNull).map(RosePlayer::new).collect(Collectors.toList());
-        members.add(new RosePlayer(Bukkit.getConsoleSender()));
-
-        for (RosePlayer member : members) {
-            // Check if the player can receive the message.
-            if (!this.canPlayerReceiveMessage(message.getSender(), member))
+        List<RosePlayer> recipients = new java.util.ArrayList<>();
+        for (UUID memberUuid : this.getMembers()) {
+            Player memberPlayer = Bukkit.getPlayer(memberUuid);
+            if (memberPlayer == null)
                 continue;
-
-            RoseChat.MESSAGE_THREAD_POOL.execute(() ->
-                    member.send(message.parse(member, format)));
+            RosePlayer rp = new RosePlayer(memberPlayer);
+            if (this.canPlayerReceiveMessage(message.getSender(), rp))
+                recipients.add(rp);
         }
+        recipients.add(new RosePlayer(Bukkit.getConsoleSender()));
 
-        // Send the message to the spies.
+        List<RosePlayer> spyRecipients = new java.util.ArrayList<>();
         for (UUID uuid : api.getPlayerDataManager().getGroupSpies()) {
-            // Continue if the spy is also a member.
             if (this.members.contains(uuid))
                 continue;
 
-            Player player = Bukkit.getPlayer(uuid);
-            if (player == null)
-                continue;
-
-            RosePlayer rosePlayer = new RosePlayer(player);
-            RoseChat.MESSAGE_THREAD_POOL.execute(() ->
-                    rosePlayer.send(message.parse(rosePlayer, Settings.GROUP_SPY_FORMAT.get())));
+            Player spyPlayer = Bukkit.getPlayer(uuid);
+            if (spyPlayer != null)
+                spyRecipients.add(new RosePlayer(spyPlayer));
         }
+
+        RoseChat.MESSAGE_THREAD_POOL.execute(() -> {
+            for (RosePlayer member : recipients) {
+                dev.rosewood.rosechat.message.contents.MessageContents parsed = message.parse(member, format);
+                member.send(parsed);
+
+                if (member.isPlayer() && parsed.outputs().getTaggedPlayers().contains(member.getUUID())) {
+                    Player p = member.asPlayer();
+                    if ((member.getPlayerData() == null || member.getPlayerData().hasTagSounds()) && parsed.outputs().getSound() != null)
+                        p.playSound(p.getLocation(), parsed.outputs().getSound(), 1.0f, 1.0f);
+
+                    if (Settings.SHOW_MENTION_ACTIONBAR.get()) {
+                        String rawMention = api.getLocaleManager().getMessageOrDefault("mention-actionbar",
+                                "<#FF8000>@ <#CCCCFF>%player% <#8E99A2>mentioned you in <#FFAA00>%channel%");
+                        if (!rawMention.isEmpty()) {
+                            String formattedMention = StringPlaceholders.of(
+                                    "player", message.getSender().getName(),
+                                    "channel", this.name != null ? this.name : this.id
+                            ).apply(rawMention);
+                            member.sendActionBar(api.parse(message.getSender(), member, formattedMention));
+                        }
+                    }
+                }
+            }
+
+            if (!spyRecipients.isEmpty()) {
+                String spyFormat = Settings.GROUP_SPY_FORMAT.get();
+                for (RosePlayer spy : spyRecipients)
+                    spy.send(message.parse(spy, spyFormat));
+            }
+        });
     }
 
     @Override

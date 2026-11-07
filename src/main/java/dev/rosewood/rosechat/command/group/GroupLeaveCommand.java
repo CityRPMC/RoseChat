@@ -29,14 +29,30 @@ public class GroupLeaveCommand extends RoseChatCommand {
                 .permission("rosechat.group.leave")
                 .playerOnly(true)
                 .arguments(ArgumentsDefinition.builder()
-                        .required("group", RoseChatArgumentHandlers.MEMBER_GROUP)
+                        .optional("group", RoseChatArgumentHandlers.MEMBER_GROUP)
                         .build())
                 .build();
     }
 
     @RoseExecutable
+    public void execute(CommandContext context) {
+        RosePlayer player = new RosePlayer(context.getSender());
+        GroupChannel group = player.getActiveGroupChannel();
+        if (group == null) {
+            player.sendLocaleMessage("no-gc");
+            return;
+        }
+
+        this.leaveGroup(player, group);
+    }
+
+    @RoseExecutable
     public void execute(CommandContext context, GroupChannel group) {
         RosePlayer player = new RosePlayer(context.getSender());
+        this.leaveGroup(player, group);
+    }
+
+    private void leaveGroup(RosePlayer player, GroupChannel group) {
 
         if (group.getOwner().equals(player.getUUID())) {
             player.sendLocaleMessage("command-gc-leave-own");

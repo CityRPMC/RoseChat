@@ -16,7 +16,10 @@ import dev.rosewood.rosegarden.command.framework.ArgumentsDefinition;
 import dev.rosewood.rosegarden.command.framework.CommandContext;
 import dev.rosewood.rosegarden.command.framework.CommandInfo;
 import dev.rosewood.rosegarden.command.framework.annotation.RoseExecutable;
+import dev.rosewood.rosegarden.utils.HexUtils;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
+import java.util.Locale;
+import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -33,35 +36,66 @@ public class GroupCreateCommand extends RoseChatCommand {
                 .permission("rosechat.group.create")
                 .playerOnly(true)
                 .arguments(ArgumentsDefinition.builder()
-                        .required("id", ArgumentHandlers.STRING)
                         .optional("name", ArgumentHandlers.GREEDY_STRING)
                         .build())
                 .build();
     }
 
     @RoseExecutable
-    public void execute(CommandContext context, String id) {
+    public void execute(CommandContext context) {
         RosePlayer player = new RosePlayer(context.getSender());
-        this.execute(player, id, player.getRealName() + "'s GroupChat");
+        String defaultName = player.getRealName() + "'s GroupChat";
+        String id = this.generateUniqueGroupId(player.getRealName());
+        this.execute(player, id, defaultName);
     }
 
     @RoseExecutable
-    public void execute(CommandContext context, String id, String name) {
-        this.execute(new RosePlayer(context.getSender()), id, name);
+    public void execute(CommandContext context, String name) {
+        RosePlayer player = new RosePlayer(context.getSender());
+        String id = this.generateUniqueGroupId(name);
+        this.execute(player, id, name);
+    }
+
+    private String generateUniqueGroupId(String rawName) {
+        String stripped = ChatColor.stripColor(HexUtils.colorify(rawName));
+        String baseSlug = stripped == null ? "" : stripped.toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+        if (baseSlug.isEmpty())
+            baseSlug = "group";
+
+        String candidate = baseSlug;
+        int suffix = 2;
+        while (this.isGroupIdTaken(candidate)) {
+            candidate = baseSlug + "_" + suffix;
+            suffix++;
+        }
+        return candidate;
+    }
+
+    private boolean isGroupIdTaken(String id) {
+        if (this.getAPI().getGroupChatById(id) != null)
+            return true;
+        for (String existingId : this.getAPI().getGroupChatIDs()) {
+            if (existingId.equalsIgnoreCase(id))
+                return true;
+        }
+        return Settings.ADD_GROUP_CHANNELS_TO_CHANNEL_LIST.get() && this.getAPI().getChannelById(id) != null;
     }
 
     private void execute(RosePlayer player, String id, String name) {
-        if (this.getAPI().getGroupChatByOwner(player.getUUID()) != null) {
-            this.getLocaleManager().sendComponentMessage(player, "command-gc-create-fail");
+        int currentGroupCount = this.getAPI().getGroupChats(player.getUUID()).size();
+        int maxAmount = player.getMaxGroupChats();
+        if (currentGroupCount >= maxAmount) {
+            if (maxAmount <= 1 && this.getAPI().getGroupChatByOwner(player.getUUID()) != null) {
+                this.getLocaleManager().sendComponentMessage(player, "command-gc-create-fail");
+            } else {
+                this.getLocaleManager().sendComponentMessage(player, "gc-limit");
+            }
             return;
         }
 
-        if (this.getAPI().getGroupChatById(id) != null) {
-            this.getLocaleManager().sendComponentMessage(player, "command-gc-already-exists");
-            return;
-        }
-
-        if (Settings.ADD_GROUP_CHANNELS_TO_CHANNEL_LIST.get() && this.getAPI().getChannelById(id) != null) {
+        if (this.isGroupIdTaken(id)) {
             this.getLocaleManager().sendComponentMessage(player, "command-gc-already-exists");
             return;
         }
@@ -107,6 +141,12 @@ public class GroupCreateCommand extends RoseChatCommand {
 
         GroupChannel group = this.getAPI().createGroupChat(id, player.asPlayer());
         group.setName(name);
+
+        if (player.getPlayerData() != null) {
+            player.getPlayerData().setLastGroupChatId(group.getId());
+            if (Settings.CAN_JOIN_GROUP_CHANNELS.get())
+                player.switchChannel(group, true);
+        }
 
         GroupCreateEvent groupCreateEvent = new GroupCreateEvent(group);
         Bukkit.getPluginManager().callEvent(groupCreateEvent);

@@ -451,6 +451,13 @@ public class RosePlayer {
             completions.add("{" + placeholder.getId() + "}");
         }
 
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (!player.canSee(online) || MessageUtils.isPlayerVanished(online))
+                continue;
+
+            completions.add("@" + online.getName());
+        }
+
         player.addCustomChatCompletions(completions);
         this.getPlayerData().setChatCompletions(completions);
     }
@@ -600,7 +607,10 @@ public class RosePlayer {
         if (bukkitPlayer != null && bukkitPlayer.isOnline() && Settings.SHOW_CHANNEL_ACTIONBAR.get()) {
             String rawFormat = this.api.getLocaleManager().getMessageOrDefault("command-channel-actionbar", "<#8E99A2>Active Channel: &b%id%");
             if (!rawFormat.isEmpty()) {
-                String formatted = StringPlaceholders.of("id", channel.getId()).apply(rawFormat);
+                String channelDisplay = (channel instanceof GroupChannel groupChannel && groupChannel.getName() != null)
+                        ? groupChannel.getName()
+                        : channel.getId();
+                String formatted = StringPlaceholders.of("id", channelDisplay).apply(rawFormat);
                 RoseChat.MESSAGE_THREAD_POOL.execute(() -> this.sendActionBar(this.api.parse(this, this, formatted)));
             }
         }
@@ -640,13 +650,83 @@ public class RosePlayer {
     }
 
     /**
-     * @return The group that this player owns, or null if they do not own one.
+     * @return The group that this player owns (preferring their currently active group if they own multiple), or null if they do not own one.
      */
     public GroupChannel getOwnedGroupChannel() {
         if (this.isConsole())
             return null;
 
+        PlayerData data = this.getPlayerData();
+        if (data != null) {
+            if (data.getCurrentChannel() instanceof GroupChannel currentGroup
+                    && this.getUUID().equals(currentGroup.getOwner())) {
+                return currentGroup;
+            }
+            if (data.getLastGroupChatId() != null) {
+                GroupChannel lastGroup = this.api.getGroupChatById(data.getLastGroupChatId());
+                if (lastGroup != null && this.getUUID().equals(lastGroup.getOwner()))
+                    return lastGroup;
+            }
+        }
+
         return this.api.getGroupChatByOwner(this.getUUID());
+    }
+
+    /**
+     * @return The player's currently active or most recently used group chat, or their first group chat if any.
+     */
+    public GroupChannel getActiveGroupChannel() {
+        if (this.isConsole() || this.getUUID() == null)
+            return null;
+
+        PlayerData data = this.getPlayerData();
+        if (data != null) {
+            if (data.getCurrentChannel() instanceof GroupChannel currentGroup
+                    && currentGroup.getMembers().contains(this.getUUID())) {
+                return currentGroup;
+            }
+            if (data.getLastGroupChatId() != null) {
+                GroupChannel lastGroup = this.api.getGroupChatById(data.getLastGroupChatId());
+                if (lastGroup != null && lastGroup.getMembers().contains(this.getUUID()))
+                    return lastGroup;
+            }
+        }
+
+        GroupChannel owned = this.api.getGroupChatByOwner(this.getUUID());
+        if (owned != null)
+            return owned;
+
+        List<GroupChannel> memberGroups = this.api.getGroupChats(this.getUUID());
+        return memberGroups.isEmpty() ? null : memberGroups.get(0);
+    }
+
+    /**
+     * @return The maximum number of group chats this player is allowed to be a member of.
+     */
+    public int getMaxGroupChats() {
+        if (!this.isPlayer())
+            return Integer.MAX_VALUE;
+
+        Player player = this.asPlayer();
+        if (player.hasPermission("rosechat.group.admin"))
+            return Integer.MAX_VALUE;
+
+        int maxAmount = Math.max(1, Settings.DEFAULT_MAX_GROUP_CHATS.get());
+        String multiPerm = Settings.MULTIPLE_GROUP_CHATS_PERMISSION.get();
+        if (multiPerm != null && !multiPerm.isBlank() && player.hasPermission(multiPerm)) {
+            maxAmount = Math.max(maxAmount, Settings.MULTIPLE_GROUP_CHATS_LIMIT.get());
+        }
+
+        for (PermissionAttachmentInfo info : player.getEffectivePermissions()) {
+            String target = info.getPermission().toLowerCase();
+            if (target.startsWith("rosechat.groups.") && info.getValue()) {
+                try {
+                    maxAmount = Math.max(maxAmount, Integer.parseInt(target.substring(target.lastIndexOf(".") + 1)));
+                } catch (NumberFormatException ignored) { }
+            }
+        }
+
+        return maxAmount;
     }
 
     /**

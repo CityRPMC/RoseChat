@@ -164,6 +164,19 @@ public final class Settings implements SettingHolder {
             "Should players be notified when they send a message in a radius channel (e.g. local) and nobody is nearby to hear them?");
     public static final RoseSetting<Boolean> SHOW_CHANNEL_ACTIONBAR = create(CHAT_SETTINGS, "show-channel-actionbar", BOOLEAN, true,
             "Should an actionbar indicator be shown when a player switches chat channels?");
+    public static final RoseSetting<String> MULTIPLE_GROUP_CHATS_PERMISSION = create(CHAT_SETTINGS, "multiple-group-chats-permission", STRING, "donator0",
+            "The permission node required for players to join or create multiple group chats.");
+    public static final RoseSetting<Integer> DEFAULT_MAX_GROUP_CHATS = create(CHAT_SETTINGS, "default-max-group-chats", INTEGER, 1,
+            "The maximum number of group chats a player without multiple-group-chats-permission can be in.");
+    public static final RoseSetting<Integer> MULTIPLE_GROUP_CHATS_LIMIT = create(CHAT_SETTINGS, "multiple-group-chats-limit", INTEGER, 5,
+            "The maximum number of group chats a player with multiple-group-chats-permission can be in.",
+            "Players can also be granted rosechat.groups.<number> for a custom limit.");
+    public static final RoseSetting<Boolean> SHOW_MESSAGE_ACTIONBAR = create(CHAT_SETTINGS, "show-message-actionbar", BOOLEAN, true,
+            "Should an actionbar indicator be shown when a player receives a private message?");
+    public static final RoseSetting<Boolean> SHOW_MENTION_ACTIONBAR = create(CHAT_SETTINGS, "show-mention-actionbar", BOOLEAN, true,
+            "Should an actionbar indicator be shown when a player is @mentioned in chat?");
+    public static final RoseSetting<Boolean> SHOW_LOGIN_CHANNEL_REMINDER = create(CHAT_SETTINGS, "show-login-channel-reminder", BOOLEAN, true,
+            "Should players be reminded on login if their active channel is not the default channel?");
 
     public static final RoseSetting<ConfigurationSection> DISCORD_SETTINGS = create("discord-settings", "Discord Settings", "Requires DiscordSRV");
     public static final RoseSetting<Boolean> USE_DISCORD = create(DISCORD_SETTINGS, "use-discord", BOOLEAN, true,

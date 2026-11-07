@@ -63,15 +63,6 @@ public class MessageCommand extends RoseChatCommand {
                 return;
             }
 
-            AtomicBoolean canBeMessaged = new AtomicBoolean(true);
-            if (target != null && !player.hasPermission("rosechat.togglemessage.bypass")) {
-                this.getAPI().getPlayerData(target.getUUID(), data -> {
-                    if (data != null && !data.canBeMessaged()) {
-                        canBeMessaged.set(false);
-                    }
-                });
-            }
-
             if (target != null && target.isPlayer()) {
                 if (MessageUtils.isPlayerVanished(target.asPlayer()) && !Settings.ALLOW_MESSAGING_VANISHED_PLAYERS.get()
                         && !player.hasPermission("rosechat.messagebypass")) {
@@ -80,9 +71,12 @@ public class MessageCommand extends RoseChatCommand {
                 }
             }
 
-            if (!canBeMessaged.get()) {
-                player.sendLocaleMessage("command-togglemessage-cannot-message");
-                return;
+            if (target != null && !player.hasPermission("rosechat.togglemessage.bypass")) {
+                PlayerData targetData = target.getPlayerData();
+                if (targetData != null && !targetData.canBeMessaged()) {
+                    player.sendLocaleMessage("command-togglemessage-cannot-message");
+                    return;
+                }
             }
 
             MessageUtils.sendPrivateMessage(player, messagePlayer.getRealName(), message);

@@ -30,14 +30,13 @@ public class GroupArgumentHandler extends ArgumentHandler<GroupChannel> {
         boolean isConsole = (context.getSender() instanceof ConsoleCommandSender);
 
         GroupChannel group = RoseChatAPI.getInstance().getGroupChatById(input);
-        if (!this.checkPermissions || (hasAdminPermission || isConsole)) {
-            if (group == null)
-                throw new HandledArgumentException("argument-handler-group");
+        if (group == null)
+            throw new HandledArgumentException("argument-handler-group");
 
+        if (!this.checkPermissions || (hasAdminPermission || isConsole))
             return group;
-        }
 
-        if (!group.getMembers().contains(((Player) context).getUniqueId()))
+        if (!(context.getSender() instanceof Player player) || !group.getMembers().contains(player.getUniqueId()))
             throw new HandledArgumentException("gc-invalid");
 
         return group;
@@ -52,7 +51,10 @@ public class GroupArgumentHandler extends ArgumentHandler<GroupChannel> {
         if (!this.checkPermissions || (hasAdminPermission || isConsole))
             return RoseChatAPI.getInstance().getGroupChatIDs();
 
-        return RoseChatAPI.getInstance().getGroupChats(((Player) context).getUniqueId()).stream()
+        if (!(context.getSender() instanceof Player player))
+            return java.util.Collections.emptyList();
+
+        return RoseChatAPI.getInstance().getGroupChats(player.getUniqueId()).stream()
                 .map(GroupChannel::getId).collect(Collectors.toList());
     }
 

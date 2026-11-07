@@ -41,7 +41,27 @@ public class GroupManager extends Manager {
     }
 
     public GroupChannel getGroupChatById(String id) {
-        return this.groupChats.get(id);
+        if (id == null)
+            return null;
+
+        GroupChannel exact = this.groupChats.get(id);
+        if (exact != null)
+            return exact;
+
+        for (Map.Entry<String, GroupChannel> entry : this.groupChats.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(id))
+                return entry.getValue();
+        }
+
+        for (GroupChannel groupChat : this.groupChats.values()) {
+            if (groupChat.getName() != null) {
+                String stripped = org.bukkit.ChatColor.stripColor(dev.rosewood.rosegarden.utils.HexUtils.colorify(groupChat.getName()));
+                if (stripped.equalsIgnoreCase(id) || stripped.replace(' ', '_').equalsIgnoreCase(id))
+                    return groupChat;
+            }
+        }
+
+        return null;
     }
 
     public GroupChannel getGroupChatByOwner(UUID owner) {
@@ -56,8 +76,10 @@ public class GroupManager extends Manager {
     public void loadGroupChat(String id, Consumer<GroupChannel> callback) {
         Bukkit.getScheduler().runTaskAsynchronously(this.rosePlugin, () -> {
             GroupChannel group = this.dataManager.getGroupChannel(id);
-            List<UUID> members = this.dataManager.getGroupChatMembers(id);
-            group.setMembers(members);
+            if (group != null) {
+                List<UUID> members = this.dataManager.getGroupChatMembers(id);
+                group.setMembers(members);
+            }
             callback.accept(group);
         });
     }

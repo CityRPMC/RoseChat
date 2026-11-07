@@ -33,6 +33,7 @@ public class PlayerData {
     private boolean isCurrentChannelGroupChannel;
     private Channel currentChannel;
     private Channel activeChannel;
+    private String lastGroupChatId;
     private String color;
     private String nickname;
     private String strippedDisplayName;
@@ -211,7 +212,18 @@ public class PlayerData {
      * @param currentChannel The channel to use.
      */
     public void setCurrentChannel(Channel currentChannel) {
-          this.currentChannel = currentChannel;
+        this.currentChannel = currentChannel;
+        if (currentChannel instanceof GroupChannel) {
+            this.lastGroupChatId = currentChannel.getId();
+        }
+    }
+
+    public String getLastGroupChatId() {
+        return this.lastGroupChatId;
+    }
+
+    public void setLastGroupChatId(String lastGroupChatId) {
+        this.lastGroupChatId = lastGroupChatId;
     }
 
     /**

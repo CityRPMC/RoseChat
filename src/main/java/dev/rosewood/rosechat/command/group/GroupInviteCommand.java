@@ -10,10 +10,12 @@ import dev.rosewood.rosegarden.command.framework.CommandContext;
 import dev.rosewood.rosegarden.command.framework.CommandInfo;
 import dev.rosewood.rosegarden.command.framework.annotation.RoseExecutable;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
+import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.hover.content.Text;
 
 public class GroupInviteCommand extends RoseChatCommand {
 
@@ -29,6 +31,7 @@ public class GroupInviteCommand extends RoseChatCommand {
                 .playerOnly(true)
                 .arguments(ArgumentsDefinition.builder()
                         .required("player", RoseChatArgumentHandlers.ROSE_PLAYER)
+                        .optional("group", RoseChatArgumentHandlers.MEMBER_GROUP)
                         .build())
                 .build();
     }
@@ -41,7 +44,20 @@ public class GroupInviteCommand extends RoseChatCommand {
             player.sendLocaleMessage("no-gc");
             return;
         }
+        this.inviteToGroup(player, target, group);
+    }
 
+    @RoseExecutable
+    public void execute(CommandContext context, RosePlayer target, GroupChannel group) {
+        RosePlayer player = new RosePlayer(context.getSender());
+        if (!group.getOwner().equals(player.getUUID()) && !player.hasPermission("rosechat.group.admin")) {
+            player.sendLocaleMessage("no-gc");
+            return;
+        }
+        this.inviteToGroup(player, target, group);
+    }
+
+    private void inviteToGroup(RosePlayer player, RosePlayer target, GroupChannel group) {
         if (group.getMembers().contains(target.getUUID())) {
             player.sendLocaleMessage("command-gc-invite-member");
             return;
@@ -60,18 +76,32 @@ public class GroupInviteCommand extends RoseChatCommand {
                         "name", group.getName()
                 ));
 
-        // Build and send the clickable accept message.
+        // Build and send the clickable accept/deny buttons with full hex color support.
+        BaseComponent[] acceptComponents = TextComponent.fromLegacyText(
+                this.getLocaleManager().getLocaleMessage("command-gc-accept-accept"));
+        HoverEvent acceptHover = new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                new Text(TextComponent.fromLegacyText(this.getLocaleManager().getLocaleMessage("command-gc-accept-hover"))));
+        ClickEvent acceptClick = new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/group accept " + group.getId());
+        for (BaseComponent comp : acceptComponents) {
+            comp.setHoverEvent(acceptHover);
+            comp.setClickEvent(acceptClick);
+        }
+
+        BaseComponent[] denyComponents = TextComponent.fromLegacyText(
+                this.getLocaleManager().getLocaleMessage("command-gc-deny-deny"));
+        HoverEvent denyHover = new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                new Text(TextComponent.fromLegacyText(this.getLocaleManager().getLocaleMessage("command-gc-deny-hover"))));
+        ClickEvent denyClick = new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/group deny " + group.getId());
+        for (BaseComponent comp : denyComponents) {
+            comp.setHoverEvent(denyHover);
+            comp.setClickEvent(denyClick);
+        }
+
         ComponentBuilder builder = new ComponentBuilder();
         builder.append("          ");
-        builder.append(this.getLocaleManager().getLocaleMessage("command-gc-accept-accept"))
-                .event(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                        TextComponent.fromLegacyText(this.getLocaleManager().getLocaleMessage("command-gc-accept-hover"))))
-                .event(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/group accept " + group.getId()));
-        builder.append("          ").retain(ComponentBuilder.FormatRetention.NONE);
-        builder.append(this.getLocaleManager().getLocaleMessage("command-gc-deny-deny"))
-                .event(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                        TextComponent.fromLegacyText(this.getLocaleManager().getLocaleMessage("command-gc-deny-hover"))))
-                .event(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/group deny " + group.getId()));
+        builder.append(acceptComponents, ComponentBuilder.FormatRetention.NONE);
+        builder.append("          ", ComponentBuilder.FormatRetention.NONE);
+        builder.append(denyComponents, ComponentBuilder.FormatRetention.NONE);
 
         target.send(builder.create());
     }

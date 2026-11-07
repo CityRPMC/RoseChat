@@ -65,6 +65,19 @@ public class GroupPromoteCommand extends RoseChatCommand {
                         ));
         target.sendLocaleMessage("command-gc-promote-promoted",
                 StringPlaceholders.of("name", group.getName()));
+
+        for (java.util.UUID uuid : group.getMembers()) {
+            if ((player.isPlayer() && uuid.equals(player.getUUID())) || uuid.equals(target.getUUID()))
+                continue;
+            org.bukkit.entity.Player member = org.bukkit.Bukkit.getPlayer(uuid);
+            if (member != null) {
+                this.getLocaleManager().sendComponentMessage(member, "command-gc-promote-success",
+                        StringPlaceholders.of(
+                                "player", target.getName(),
+                                "name", group.getName()
+                        ));
+            }
+        }
     }
 
 }

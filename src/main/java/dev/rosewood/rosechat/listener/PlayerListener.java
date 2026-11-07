@@ -83,11 +83,42 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        if (NMSUtil.getVersionNumber() < 19 || !Settings.ALLOW_CHAT_SUGGESTIONS.get())
-            return;
-
         RosePlayer player = new RosePlayer(event.getPlayer());
-        player.validateChatCompletion();
+        if (NMSUtil.getVersionNumber() >= 19 && Settings.ALLOW_CHAT_SUGGESTIONS.get()) {
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                new RosePlayer(online).validateChatCompletion();
+            }
+        }
+
+        if (Settings.SHOW_LOGIN_CHANNEL_REMINDER.get()) {
+            Bukkit.getScheduler().runTaskLater(RoseChat.getInstance(), () -> {
+                if (!event.getPlayer().isOnline())
+                    return;
+
+                RosePlayer joined = new RosePlayer(event.getPlayer());
+                Channel current = joined.getChannel();
+                Channel defaultChannel = RoseChatAPI.getInstance().getChannelManager().getDefaultChannel();
+                if (current != null && defaultChannel != null && !current.getId().equalsIgnoreCase(defaultChannel.getId())) {
+                    String channelLabel = current instanceof GroupChannel groupChannel ? groupChannel.getName() : current.getId();
+                    String rawReminder = RoseChatAPI.getInstance().getLocaleManager().getMessageOrDefault(
+                            "login-channel-reminder",
+                            "<#FF8000>[Chat] <#FFFFCC>You are speaking in <#FFAA00>%channel%<#FFFFCC>. Use <#FF8000>/g <#FFFFCC>for Global chat.");
+                    if (!rawReminder.isEmpty()) {
+                        joined.send(RoseChatAPI.getInstance().parse(joined, joined,
+                                rawReminder.replace("%channel%", channelLabel)));
+                    }
+                    if (Settings.SHOW_CHANNEL_ACTIONBAR.get()) {
+                        String rawActionbar = RoseChatAPI.getInstance().getLocaleManager().getMessageOrDefault(
+                                "channel-actionbar",
+                                "<#FFAA00>Channel: <#FFFFCC>%id%");
+                        if (!rawActionbar.isEmpty()) {
+                            joined.sendActionBar(RoseChatAPI.getInstance().parse(joined, joined,
+                                    rawActionbar.replace("%id%", channelLabel)));
+                        }
+                    }
+                }
+            }, 25L);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -104,29 +135,40 @@ public class PlayerListener implements Listener {
                 playerDataManager.unloadPlayerData(player.getUUID());
         }, 20L * 30L);
 
-        GroupChannel group = player.getOwnedGroupChannel();
-        if (group == null)
-            return;
+        if (NMSUtil.getVersionNumber() >= 19 && Settings.ALLOW_CHAT_SUGGESTIONS.get()) {
+            Bukkit.getScheduler().runTaskLater(RoseChat.getInstance(), () -> {
+                for (Player online : Bukkit.getOnlinePlayers()) {
+                    new RosePlayer(online).validateChatCompletion();
+                }
+            }, 2L);
+        }
 
         if (Settings.DISBAND_GROUP_ON_OWNER_DISCONNECT.get()) {
-            boolean success = group.disband();
-            if (!success)
-                return;
-
             RoseChatAPI api = RoseChatAPI.getInstance();
-            List<UUID> members = new ArrayList<>(group.getMembers());
-            for (UUID uuid : members) {
-                Player member = Bukkit.getPlayer(uuid);
-                if (member == null)
+            List<GroupChannel> ownedGroups = new ArrayList<>();
+            for (GroupChannel gc : api.getGroupChats(player.getUUID())) {
+                if (gc.getOwner().equals(player.getUUID()))
+                    ownedGroups.add(gc);
+            }
+
+            for (GroupChannel group : ownedGroups) {
+                if (!group.disband())
                     continue;
 
-                RosePlayer roseMember = new RosePlayer(member);
-                PlayerData data = api.getPlayerData(member.getUniqueId());
-                if (data.isCurrentChannelGroupChannel() && data.getCurrentChannel().getId().equalsIgnoreCase(group.getId()))
-                    roseMember.switchChannel(roseMember.findChannel());
+                List<UUID> members = new ArrayList<>(group.getMembers());
+                for (UUID uuid : members) {
+                    Player member = Bukkit.getPlayer(uuid);
+                    if (member == null)
+                        continue;
 
-                api.getLocaleManager().sendComponentMessage(member, "command-gc-disband-success",
-                        StringPlaceholders.of("name", group.getName()));
+                    RosePlayer roseMember = new RosePlayer(member);
+                    PlayerData data = api.getPlayerData(member.getUniqueId());
+                    if (data.isCurrentChannelGroupChannel() && data.getCurrentChannel().getId().equalsIgnoreCase(group.getId()))
+                        roseMember.switchChannel(roseMember.findChannel());
+
+                    api.getLocaleManager().sendComponentMessage(member, "command-gc-disband-success",
+                            StringPlaceholders.of("name", group.getName()));
+                }
             }
         }
     }

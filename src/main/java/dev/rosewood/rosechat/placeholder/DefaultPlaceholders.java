@@ -25,6 +25,14 @@ public final class DefaultPlaceholders {
                 .add("player_displayname", sender.getDisplayName())
                 .add("player_nickname", sender.getName());
 
+        if (sender.isPlayer() && sender.asPlayer() != null) {
+            org.bukkit.Location loc = sender.asPlayer().getLocation();
+            builder.add("player_x", loc.getBlockX())
+                    .add("player_y", loc.getBlockY())
+                    .add("player_z", loc.getBlockZ())
+                    .add("player_world", loc.getWorld() != null ? loc.getWorld().getName() : "world");
+        }
+
         if (viewer != null) {
             builder.add("other_player_name", viewer.getRealName())
                     .add("other_player_displayname", viewer.getDisplayName())

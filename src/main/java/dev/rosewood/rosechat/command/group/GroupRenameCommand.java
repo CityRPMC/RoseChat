@@ -93,6 +93,16 @@ public class GroupRenameCommand extends RoseChatCommand {
 
         this.getLocaleManager().sendComponentMessage(player, "command-gc-rename-success",
                 StringPlaceholders.of("name", name));
+
+        for (java.util.UUID uuid : group.getMembers()) {
+            if (player.isPlayer() && uuid.equals(player.getUUID()))
+                continue;
+            Player member = Bukkit.getPlayer(uuid);
+            if (member != null) {
+                this.getLocaleManager().sendComponentMessage(member, "command-gc-rename-success",
+                        StringPlaceholders.of("name", name));
+            }
+        }
     }
 
 }

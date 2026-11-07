@@ -313,6 +313,14 @@ public class MessageUtils {
                     if (targetData != null && targetData.hasMessageSounds() && Settings.MESSAGE_SOUND.get() != null) {
                         targetPlayer.playSound(targetPlayer.getLocation(), Settings.MESSAGE_SOUND.get(), 1.0f, 1.0f);
                     }
+                    if (Settings.SHOW_MESSAGE_ACTIONBAR.get()) {
+                        String rawActionbar = api.getLocaleManager().getMessageOrDefault("message-received-actionbar",
+                                "<#FFAA00>✉ <#FFFFCC>New message from <#FF8000>%player% <#CCCCFF>(/r to reply)");
+                        if (!rawActionbar.isEmpty()) {
+                            messageTarget.sendActionBar(api.parse(sender, messageTarget,
+                                    rawActionbar.replace("%player%", sender.getName())));
+                        }
+                    }
                 }
             }
         });

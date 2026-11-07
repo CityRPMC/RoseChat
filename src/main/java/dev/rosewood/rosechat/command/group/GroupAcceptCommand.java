@@ -40,6 +40,10 @@ public class GroupAcceptCommand extends RoseChatCommand {
     public void execute(CommandContext context) {
         RosePlayer player = new RosePlayer(context.getSender());
         PlayerData data = player.getPlayerData();
+        if (data.getGroupInvites().isEmpty()) {
+            this.getLocaleManager().sendComponentMessage(player, "gc-no-invites");
+            return;
+        }
         this.execute(player, data.getGroupInvites().get(data.getGroupInvites().size() - 1));
     }
 
@@ -52,17 +56,7 @@ public class GroupAcceptCommand extends RoseChatCommand {
         PlayerData data = player.getPlayerData();
 
         int currentGroupCount = this.getAPI().getGroupChats(player.getUUID()).size();
-        int maxAmount = 1;
-        for (PermissionAttachmentInfo info : player.asPlayer().getEffectivePermissions()) {
-            String target = info.getPermission().toLowerCase();
-            if (target.startsWith("rosechat.groups.") && info.getValue()) {
-                try {
-                    maxAmount = Math.max(maxAmount, Integer.parseInt(target.substring(target.lastIndexOf(".") + 1)));
-                } catch (NumberFormatException ignored) {
-
-                }
-            }
-        }
+        int maxAmount = player.getMaxGroupChats();
 
         if (currentGroupCount >= maxAmount) {
             this.getLocaleManager().sendComponentMessage(player, "gc-limit");
@@ -74,6 +68,7 @@ public class GroupAcceptCommand extends RoseChatCommand {
             return;
 
         data.getGroupInvites().remove(group);
+        data.setLastGroupChatId(group.getId());
 
         String name = player.getName();
 

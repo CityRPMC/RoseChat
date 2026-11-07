@@ -1,6 +1,7 @@
 package dev.rosewood.rosechat.command.argument;
 
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.hook.channel.rosechat.GroupChannel;
 import dev.rosewood.rosegarden.command.framework.Argument;
 import dev.rosewood.rosegarden.command.framework.ArgumentHandler;
 import dev.rosewood.rosegarden.command.framework.CommandContext;
@@ -16,10 +17,16 @@ public class OfflineGroupArgumentHandler extends ArgumentHandler<String> {
     @Override
     public String handle(CommandContext context, Argument argument, InputIterator inputIterator) throws HandledArgumentException {
         String input = inputIterator.next();
-        if (!RoseChatAPI.getInstance().getGroupChatIDs().contains(input))
-            throw new HandledArgumentException("argument-handler-group");
+        GroupChannel loaded = RoseChatAPI.getInstance().getGroupChatById(input);
+        if (loaded != null)
+            return loaded.getId();
 
-        return input;
+        for (String existingId : RoseChatAPI.getInstance().getGroupChatIDs()) {
+            if (existingId.equalsIgnoreCase(input))
+                return existingId;
+        }
+
+        throw new HandledArgumentException("argument-handler-group");
     }
 
     @Override

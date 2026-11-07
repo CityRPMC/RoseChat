@@ -29,8 +29,7 @@ public class GroupMembersCommand extends RoseChatCommand {
                 .descriptionKey("command-gc-members-description")
                 .permission("rosechat.group.members")
                 .arguments(ArgumentsDefinition.builder()
-                        .optional("group", RoseChatArgumentHandlers.OFFLINE_GROUP,
-                                ArgumentCondition.hasPermission("rosechat.group.admin"))
+                        .optional("group", RoseChatArgumentHandlers.OFFLINE_GROUP)
                         .build())
                 .build();
     }
@@ -38,7 +37,9 @@ public class GroupMembersCommand extends RoseChatCommand {
     @RoseExecutable
     public void execute(CommandContext context) {
         RosePlayer player = new RosePlayer(context.getSender());
-        GroupChannel group = player.getOwnedGroupChannel();
+        GroupChannel group = player.getActiveGroupChannel();
+        if (group == null)
+            group = player.getOwnedGroupChannel();
         if (group == null) {
             player.sendLocaleMessage("no-gc");
             return;
@@ -49,8 +50,20 @@ public class GroupMembersCommand extends RoseChatCommand {
 
     @RoseExecutable
     public void execute(CommandContext context, String groupId) {
+        RosePlayer player = new RosePlayer(context.getSender());
         GroupManager groupManager = this.getAPI().getGroupManager();
-        groupManager.loadGroupChat(groupId, (group) -> this.execute(new RosePlayer(context.getSender()), group));
+        groupManager.loadGroupChat(groupId, (group) -> {
+            if (group == null) {
+                player.sendLocaleMessage("argument-handler-group");
+                return;
+            }
+            if (player.isPlayer() && !player.hasPermission("rosechat.group.admin")
+                    && !group.getMembers().contains(player.getUUID())) {
+                player.sendLocaleMessage("gc-invalid");
+                return;
+            }
+            this.execute(player, group);
+        });
     }
 
     private void execute(RosePlayer player, GroupChannel group) {

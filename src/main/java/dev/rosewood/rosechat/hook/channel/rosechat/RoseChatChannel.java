@@ -323,6 +323,17 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         if (!outputs.getTaggedPlayers().contains(receiver.getUUID()))
             return;
 
+        if (Settings.SHOW_MENTION_ACTIONBAR.get()
+                && (receiver.getPlayerData() == null || receiver.getPlayerData().hasTagSounds())) {
+            String rawActionbar = RoseChatAPI.getInstance().getLocaleManager().getMessageOrDefault("mention-actionbar",
+                    "<#FFAA00>🔔 <#FFFFCC>%player% <#CCCCFF>mentioned you in <#FF8000>%channel%");
+            if (!rawActionbar.isEmpty()) {
+                receiver.sendActionBar(RoseChatAPI.getInstance().parse(message.getSender(), receiver,
+                        rawActionbar.replace("%player%", message.getSender().getName())
+                                .replace("%channel%", this.getId())));
+            }
+        }
+
         if ((receiver.getPlayerData() != null && !receiver.getPlayerData().hasTagSounds()) || outputs.getSound() == null)
             return;
 

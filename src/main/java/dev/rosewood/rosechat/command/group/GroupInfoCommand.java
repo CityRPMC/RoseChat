@@ -29,8 +29,7 @@ public class GroupInfoCommand extends RoseChatCommand {
                 .descriptionKey("command-gc-info-description")
                 .permission("rosechat.group.info")
                 .arguments(ArgumentsDefinition.builder()
-                        .optional("group", RoseChatArgumentHandlers.OFFLINE_GROUP,
-                                ArgumentCondition.hasPermission("rosechat.group.admin"))
+                        .optional("group", RoseChatArgumentHandlers.OFFLINE_GROUP)
                         .build())
                 .build();
     }
@@ -38,7 +37,9 @@ public class GroupInfoCommand extends RoseChatCommand {
     @RoseExecutable
     public void execute(CommandContext context) {
         RosePlayer player = new RosePlayer(context.getSender());
-        GroupChannel group = player.getOwnedGroupChannel();
+        GroupChannel group = player.getActiveGroupChannel();
+        if (group == null)
+            group = player.getOwnedGroupChannel();
         if (group == null) {
             player.sendLocaleMessage("no-gc");
             return;
@@ -53,8 +54,22 @@ public class GroupInfoCommand extends RoseChatCommand {
 
     @RoseExecutable
     public void execute(CommandContext context, String group) {
+        RosePlayer player = new RosePlayer(context.getSender());
+        GroupChannel loaded = this.getAPI().getGroupChatById(group);
+        if (player.isPlayer() && !player.hasPermission("rosechat.group.admin")) {
+            if (loaded == null || !loaded.getMembers().contains(player.getUUID())) {
+                player.sendLocaleMessage("gc-invalid");
+                return;
+            }
+        }
         GroupManager groupManager = this.getAPI().getGroupManager();
-        groupManager.getGroupInfo(group, (info) -> this.execute(new RosePlayer(context.getSender()), info));
+        groupManager.getGroupInfo(group, (info) -> {
+            if (info == null) {
+                player.sendLocaleMessage("argument-handler-group");
+                return;
+            }
+            this.execute(player, info);
+        });
     }
 
     private void execute(RosePlayer player, GroupInfo info) {
