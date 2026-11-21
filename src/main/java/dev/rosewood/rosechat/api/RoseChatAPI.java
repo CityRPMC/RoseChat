@@ -347,6 +347,43 @@ public final class RoseChatAPI {
         return data == null ? java.util.Collections.emptyList() : java.util.Collections.unmodifiableList(data.getFriends());
     }
 
+    public String getStatus(UUID player) {
+        if (player == null)
+            return null;
+        PlayerData data = this.getPlayerData(player);
+        return data == null ? null : data.getStatus();
+    }
+
+    public boolean isDnd(UUID player) {
+        if (player == null)
+            return false;
+        PlayerData data = this.getPlayerData(player);
+        return data != null && data.isDnd();
+    }
+
+    public List<String> getMutualGroupChatNames(UUID a, UUID b) {
+        if (a == null || b == null || a.equals(b))
+            return java.util.Collections.emptyList();
+        return this.getGroupChats(a).stream()
+                .filter(gc -> gc.getMembers().contains(b))
+                .map(GroupChannel::getName)
+                .collect(Collectors.toList());
+    }
+
+    public boolean ownsGroupChat(UUID owner) {
+        return owner != null && this.getGroupChatByOwner(owner) != null;
+    }
+
+    public boolean canInviteToOwnedGroup(UUID owner, UUID target) {
+        if (owner == null || target == null || owner.equals(target))
+            return false;
+        for (GroupChannel gc : this.getGroupChats(owner)) {
+            if (owner.equals(gc.getOwner()) && !gc.getMembers().contains(target))
+                return true;
+        }
+        return false;
+    }
+
     /**
      * @return An instance of the locale manager.
      */

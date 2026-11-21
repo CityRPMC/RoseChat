@@ -66,7 +66,6 @@ permissions:
       rosechat.friend: true
       rosechat.dnd: true
       rosechat.status: true
-      rosechat.profile: true
       rosechat.deletemessages: true
       rosechat.discordchannel: true
       rosechat.code: true
@@ -359,9 +358,6 @@ permissions:
     default: true
   rosechat.status:
     description: Allows setting a custom social RP status.
-    default: true
-  rosechat.profile:
-    description: Allows viewing player social profiles.
     default: true
   rosechat.deletemessages:
     description: Allows players to delete messages
