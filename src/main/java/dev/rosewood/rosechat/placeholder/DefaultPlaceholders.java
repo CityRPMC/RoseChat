@@ -1,10 +1,14 @@
 package dev.rosewood.rosechat.placeholder;
 
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.chat.PlayerData;
 import dev.rosewood.rosechat.chat.channel.Channel;
+import dev.rosewood.rosechat.hook.DigiDocumentsHook;
+import dev.rosewood.rosechat.hook.DigiDocumentsHook.CivilDocument;
 import dev.rosewood.rosechat.hook.channel.rosechat.GroupChannel;
 import dev.rosewood.rosechat.message.RosePlayer;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
+import java.util.Optional;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
 
@@ -31,6 +35,17 @@ public final class DefaultPlaceholders {
                     .add("player_y", loc.getBlockY())
                     .add("player_z", loc.getBlockZ())
                     .add("player_world", loc.getWorld() != null ? loc.getWorld().getName() : "world");
+        }
+
+        if (sender.getUUID() != null) {
+            Optional<CivilDocument> doc = DigiDocumentsHook.getCachedDocument(sender.getUUID());
+            builder.add("rp_name", doc.map(CivilDocument::fullName).orElse(""))
+                    .add("rp_pronouns", doc.map(CivilDocument::formattedPronouns).orElse("Not set"))
+                    .add("rp_age", doc.map(d -> String.valueOf(d.age())).orElse(""));
+
+            PlayerData senderData = sender.getPlayerData();
+            String status = (senderData != null && senderData.getStatus() != null) ? senderData.getStatus() : "None";
+            builder.add("player_status", status);
         }
 
         if (viewer != null) {

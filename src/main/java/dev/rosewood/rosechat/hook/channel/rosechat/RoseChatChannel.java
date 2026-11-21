@@ -323,6 +323,9 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         if (!outputs.getTaggedPlayers().contains(receiver.getUUID()))
             return;
 
+        if (receiver.getPlayerData() != null && receiver.getPlayerData().isDnd())
+            return;
+
         if (Settings.SHOW_MENTION_ACTIONBAR.get()
                 && (receiver.getPlayerData() == null || receiver.getPlayerData().hasTagSounds())) {
             String rawActionbar = RoseChatAPI.getInstance().getLocaleManager().getMessageOrDefault("mention-actionbar",

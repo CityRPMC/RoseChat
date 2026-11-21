@@ -63,9 +63,23 @@ public class GroupInviteCommand extends RoseChatCommand {
             return;
         }
 
+        if (this.getAPI().isBlocked(player.getUUID(), target.getUUID())
+                && !player.hasPermission("rosechat.block.bypass")) {
+            player.sendLocaleMessage("command-block-cannot-message");
+            return;
+        }
+
         if (target.getPlayerData() != null && target.getPlayerData().getIgnoringPlayers().contains(player.getUUID())) {
             player.sendLocaleMessage("command-togglemessage-cannot-message");
             return;
+        }
+
+        for (java.util.UUID memberUuid : group.getMembers()) {
+            if (!memberUuid.equals(player.getUUID()) && this.getAPI().isBlocked(memberUuid, target.getUUID())) {
+                player.sendLocaleMessage("command-gc-invite-blocked-member",
+                        StringPlaceholders.of("player", target.getName(), "name", group.getName()));
+                break;
+            }
         }
 
         target.invite(group);

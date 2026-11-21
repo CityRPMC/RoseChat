@@ -8,6 +8,7 @@ import dev.rosewood.rosechat.config.Settings;
 import dev.rosewood.rosechat.hook.channel.rosechat.GroupChannel;
 import dev.rosewood.rosechat.manager.ChannelManager;
 import dev.rosewood.rosechat.manager.PlayerDataManager;
+import dev.rosewood.rosechat.message.MessageUtils;
 import dev.rosewood.rosechat.message.RosePlayer;
 import dev.rosewood.rosegarden.utils.NMSUtil;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
@@ -119,11 +120,54 @@ public class PlayerListener implements Listener {
                 }
             }, 25L);
         }
+
+        if (Settings.SHOW_FRIEND_JOIN_QUIT_ALERTS.get() && !MessageUtils.isPlayerVanished(event.getPlayer())) {
+            Bukkit.getScheduler().runTaskLater(RoseChat.getInstance(), () -> {
+                if (!event.getPlayer().isOnline() || MessageUtils.isPlayerVanished(event.getPlayer()))
+                    return;
+
+                RosePlayer joined = new RosePlayer(event.getPlayer());
+                PlayerData joinedData = joined.getPlayerData();
+                if (joinedData == null)
+                    return;
+
+                for (UUID friendUuid : joinedData.getFriends()) {
+                    Player onlineFriend = Bukkit.getPlayer(friendUuid);
+                    if (onlineFriend == null)
+                        continue;
+
+                    RosePlayer friendRose = new RosePlayer(onlineFriend);
+                    PlayerData friendData = friendRose.getPlayerData();
+                    if (friendData != null && !friendData.isDnd()) {
+                        friendRose.sendLocaleMessage("friend-join-alert",
+                                StringPlaceholders.of("player", joined.getName()));
+                    }
+                }
+            }, 30L);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerQuit(PlayerQuitEvent event) {
         RosePlayer player = new RosePlayer(event.getPlayer());
+
+        if (Settings.SHOW_FRIEND_JOIN_QUIT_ALERTS.get() && !MessageUtils.isPlayerVanished(event.getPlayer())) {
+            PlayerData quittingData = player.getPlayerData();
+            if (quittingData != null) {
+                for (UUID friendUuid : quittingData.getFriends()) {
+                    Player onlineFriend = Bukkit.getPlayer(friendUuid);
+                    if (onlineFriend == null)
+                        continue;
+
+                    RosePlayer friendRose = new RosePlayer(onlineFriend);
+                    PlayerData friendData = friendRose.getPlayerData();
+                    if (friendData != null && !friendData.isDnd()) {
+                        friendRose.sendLocaleMessage("friend-quit-alert",
+                                StringPlaceholders.of("player", player.getName()));
+                    }
+                }
+            }
+        }
 
         PlayerDataManager playerDataManager = this.plugin.getManager(PlayerDataManager.class);
         playerDataManager.getPlayerData(player.getUUID()).save();

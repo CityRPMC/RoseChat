@@ -101,6 +101,30 @@ public class PlayerDataManager extends Manager {
         });
     }
 
+    public void addBlock(UUID blocking, UUID blocked) {
+        Bukkit.getScheduler().runTaskAsynchronously(this.rosePlugin, () -> {
+            this.dataManager.addBlock(blocking, blocked);
+        });
+    }
+
+    public void removeBlock(UUID blocking, UUID blocked) {
+        Bukkit.getScheduler().runTaskAsynchronously(this.rosePlugin, () -> {
+            this.dataManager.removeBlock(blocking, blocked);
+        });
+    }
+
+    public void addFriend(UUID player, UUID friend) {
+        Bukkit.getScheduler().runTaskAsynchronously(this.rosePlugin, () -> {
+            this.dataManager.addFriend(player, friend);
+        });
+    }
+
+    public void removeFriend(UUID player, UUID friend) {
+        Bukkit.getScheduler().runTaskAsynchronously(this.rosePlugin, () -> {
+            this.dataManager.removeFriend(player, friend);
+        });
+    }
+
     public void hideChannel(UUID uuid, String channel) {
         Bukkit.getScheduler().runTaskAsynchronously(this.rosePlugin, () -> {
             this.dataManager.hideChannel(uuid, channel);

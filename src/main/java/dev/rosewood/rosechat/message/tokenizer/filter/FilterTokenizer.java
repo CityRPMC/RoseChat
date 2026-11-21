@@ -501,6 +501,10 @@ public class FilterTokenizer extends Tokenizer {
         DetectedPlayer detectedPlayer = this.matchPartialPlayer(content, filter.id());
         if (detectedPlayer != null) {
             Player taggedPlayer = detectedPlayer.player;
+            if (params.getSender().getUUID() != null
+                    && RoseChatAPI.getInstance().isBlocked(params.getSender().getUUID(), taggedPlayer.getUniqueId())) {
+                return false;
+            }
             params.getOutputs().getTaggedPlayers().add(taggedPlayer.getUniqueId());
             params.getOutputs().setPlaceholderTarget(new RosePlayer(taggedPlayer));
         } else {

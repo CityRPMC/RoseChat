@@ -97,19 +97,22 @@ public class GroupChannel extends Channel {
                 member.send(parsed);
 
                 if (member.isPlayer() && parsed.outputs().getTaggedPlayers().contains(member.getUUID())) {
-                    Player p = member.asPlayer();
-                    if ((member.getPlayerData() == null || member.getPlayerData().hasTagSounds()) && parsed.outputs().getSound() != null)
-                        p.playSound(p.getLocation(), parsed.outputs().getSound(), 1.0f, 1.0f);
+                    boolean isDnd = member.getPlayerData() != null && member.getPlayerData().isDnd();
+                    if (!isDnd) {
+                        Player p = member.asPlayer();
+                        if ((member.getPlayerData() == null || member.getPlayerData().hasTagSounds()) && parsed.outputs().getSound() != null)
+                            p.playSound(p.getLocation(), parsed.outputs().getSound(), 1.0f, 1.0f);
 
-                    if (Settings.SHOW_MENTION_ACTIONBAR.get()) {
-                        String rawMention = api.getLocaleManager().getMessageOrDefault("mention-actionbar",
-                                "<#FF8000>@ <#CCCCFF>%player% <#8E99A2>mentioned you in <#FFAA00>%channel%");
-                        if (!rawMention.isEmpty()) {
-                            String formattedMention = StringPlaceholders.of(
-                                    "player", message.getSender().getName(),
-                                    "channel", this.name != null ? this.name : this.id
-                            ).apply(rawMention);
-                            member.sendActionBar(api.parse(message.getSender(), member, formattedMention));
+                        if (Settings.SHOW_MENTION_ACTIONBAR.get()) {
+                            String rawMention = api.getLocaleManager().getMessageOrDefault("mention-actionbar",
+                                    "<#FF8000>@ <#CCCCFF>%player% <#8E99A2>mentioned you in <#FFAA00>%channel%");
+                            if (!rawMention.isEmpty()) {
+                                String formattedMention = StringPlaceholders.of(
+                                        "player", message.getSender().getName(),
+                                        "channel", this.name != null ? this.name : this.id
+                                ).apply(rawMention);
+                                member.sendActionBar(api.parse(message.getSender(), member, formattedMention));
+                            }
                         }
                     }
                 }
@@ -133,8 +136,12 @@ public class GroupChannel extends Channel {
         if (data == null)
             return true;
 
-        if (sender.getUUID() != null)
+        if (sender.getUUID() != null) {
+            if (receiver.getUUID() != null && RoseChatAPI.getInstance().isBlocked(sender.getUUID(), receiver.getUUID()))
+                return false;
+
             return !data.getIgnoringPlayers().contains(sender.getUUID());
+        }
 
         return true;
     }

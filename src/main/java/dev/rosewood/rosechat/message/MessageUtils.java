@@ -206,14 +206,33 @@ public class MessageUtils {
             return;
         }
 
-        // If the message was sent by a player, check if the receiver is ignoring them.
-        if (sender.isPlayer()) {
+        // If the message was sent by a player, check block, ignore, and DM privacy.
+        if (sender.isPlayer() && !isConsoleName) {
             UUID targetUuid = target != null ? target.getUniqueId() : Bukkit.getOfflinePlayer(targetName).getUniqueId();
-            PlayerData targetData = RoseChatAPI.getInstance().getPlayerData(targetUuid);
-
-            if (targetData != null && targetData.getIgnoringPlayers().contains(sender.getUUID())) {
-                sender.sendLocaleMessage("command-togglemessage-cannot-message");
+            if (!sender.hasPermission("rosechat.block.bypass")
+                    && api.isBlocked(sender.getUUID(), targetUuid)) {
+                sender.sendLocaleMessage("command-block-cannot-message");
                 return;
+            }
+
+            PlayerData targetData = api.getPlayerData(targetUuid);
+            if (targetData != null) {
+                if (targetData.getIgnoringPlayers().contains(sender.getUUID())) {
+                    sender.sendLocaleMessage("command-togglemessage-cannot-message");
+                    return;
+                }
+
+                if (!sender.hasPermission("rosechat.togglemessage.bypass")) {
+                    if (targetData.getDmPrivacy() == dev.rosewood.rosechat.chat.DmPrivacy.NOBODY || !targetData.canBeMessaged()) {
+                        sender.sendLocaleMessage("command-togglemessage-cannot-message");
+                        return;
+                    }
+                    if (targetData.getDmPrivacy() == dev.rosewood.rosechat.chat.DmPrivacy.FRIENDS
+                            && !targetData.isFriend(sender.getUUID())) {
+                        sender.sendLocaleMessage("command-togglemessage-friends-only");
+                        return;
+                    }
+                }
             }
         }
 
@@ -310,16 +329,22 @@ public class MessageUtils {
                 if (messageTarget.isPlayer()) {
                     Player targetPlayer = messageTarget.asPlayer();
                     PlayerData targetData = messageTarget.getPlayerData();
-                    if (targetData != null && targetData.hasMessageSounds() && Settings.MESSAGE_SOUND.get() != null) {
-                        targetPlayer.playSound(targetPlayer.getLocation(), Settings.MESSAGE_SOUND.get(), 1.0f, 1.0f);
-                    }
-                    if (Settings.SHOW_MESSAGE_ACTIONBAR.get()) {
-                        String rawActionbar = api.getLocaleManager().getMessageOrDefault("message-received-actionbar",
-                                "<#FFAA00>✉ <#FFFFCC>New message from <#FF8000>%player% <#CCCCFF>(/r to reply)");
-                        if (!rawActionbar.isEmpty()) {
-                            messageTarget.sendActionBar(api.parse(sender, messageTarget,
-                                    rawActionbar.replace("%player%", sender.getName())));
+                    boolean isDnd = targetData != null && targetData.isDnd();
+                    if (!isDnd) {
+                        if (targetData != null && targetData.hasMessageSounds() && Settings.MESSAGE_SOUND.get() != null) {
+                            targetPlayer.playSound(targetPlayer.getLocation(), Settings.MESSAGE_SOUND.get(), 1.0f, 1.0f);
                         }
+                        if (Settings.SHOW_MESSAGE_ACTIONBAR.get()) {
+                            String rawActionbar = api.getLocaleManager().getMessageOrDefault("message-received-actionbar",
+                                    "<#FFAA00>✉ <#FFFFCC>New message from <#FF8000>%player% <#CCCCFF>(/r to reply)");
+                            if (!rawActionbar.isEmpty()) {
+                                messageTarget.sendActionBar(api.parse(sender, messageTarget,
+                                        rawActionbar.replace("%player%", sender.getName())));
+                            }
+                        }
+                    } else if (sender.isPlayer()) {
+                        sender.sendLocaleMessage("command-dnd-auto-reply",
+                                StringPlaceholders.of("player", messageTarget.getName()));
                     }
                 }
             }
@@ -521,6 +546,46 @@ public class MessageUtils {
         } else {
             return ComponentSerializer.parse(json);
         }
+    }
+
+    /**
+     * Builds a clickable chat component array with optional hover tooltip using RoseChat parsing.
+     */
+    public static BaseComponent[] clickableButton(RosePlayer viewer, String label, String hover,
+                                                  net.md_5.bungee.api.chat.ClickEvent.Action action, String value) {
+        RosePlayer console = new RosePlayer(Bukkit.getConsoleSender());
+        RoseChatAPI api = RoseChatAPI.getInstance();
+        BaseComponent[] components = api.parse(console, viewer, label).buildComponents();
+        net.md_5.bungee.api.chat.HoverEvent hoverEvent = (hover != null && !hover.isEmpty())
+                ? new net.md_5.bungee.api.chat.HoverEvent(
+                        net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
+                        new net.md_5.bungee.api.chat.hover.content.Text(api.parse(console, viewer, hover).buildComponents()))
+                : null;
+        net.md_5.bungee.api.chat.ClickEvent clickEvent = (action != null && value != null)
+                ? new net.md_5.bungee.api.chat.ClickEvent(action, value)
+                : null;
+
+        for (BaseComponent comp : components) {
+            if (hoverEvent != null)
+                comp.setHoverEvent(hoverEvent);
+            if (clickEvent != null)
+                comp.setClickEvent(clickEvent);
+        }
+
+        return components;
+    }
+
+    /**
+     * Resolves a stored UUID to the best available player display name (never null).
+     */
+    public static String resolvePlayerName(UUID uuid) {
+        if (uuid == null)
+            return "Unknown";
+        Player online = Bukkit.getPlayer(uuid);
+        if (online != null)
+            return new RosePlayer(online).getName();
+        String offlineName = Bukkit.getOfflinePlayer(uuid).getName();
+        return offlineName != null ? offlineName : uuid.toString().substring(0, 8);
     }
 
 }

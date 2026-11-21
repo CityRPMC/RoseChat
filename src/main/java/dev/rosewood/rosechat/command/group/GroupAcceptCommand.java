@@ -88,6 +88,14 @@ public class GroupAcceptCommand extends RoseChatCommand {
                         "player", name
                 ));
 
+        for (UUID uuid : group.getMembers()) {
+            if (!uuid.equals(player.getUUID()) && this.getAPI().isBlocked(player.getUUID(), uuid)) {
+                this.getLocaleManager().sendComponentMessage(player, "command-gc-accept-blocked-warning",
+                        StringPlaceholders.of("name", group.getName()));
+                break;
+            }
+        }
+
 
     }
 

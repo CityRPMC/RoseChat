@@ -177,6 +177,10 @@ public final class Settings implements SettingHolder {
             "Should an actionbar indicator be shown when a player is @mentioned in chat?");
     public static final RoseSetting<Boolean> SHOW_LOGIN_CHANNEL_REMINDER = create(CHAT_SETTINGS, "show-login-channel-reminder", BOOLEAN, true,
             "Should players be reminded on login if their active channel is not the default channel?");
+    public static final RoseSetting<Boolean> SHOW_FRIEND_JOIN_QUIT_ALERTS = create(CHAT_SETTINGS, "show-friend-join-quit-alerts", BOOLEAN, true,
+            "Should online friends receive a notification when a friend joins or leaves the server?");
+    public static final RoseSetting<Integer> MAX_STATUS_LENGTH = create(CHAT_SETTINGS, "max-status-length", INTEGER, 64,
+            "The maximum character length allowed for a player's /status message.");
 
     public static final RoseSetting<ConfigurationSection> DISCORD_SETTINGS = create("discord-settings", "Discord Settings", "Requires DiscordSRV");
     public static final RoseSetting<Boolean> USE_DISCORD = create(DISCORD_SETTINGS, "use-discord", BOOLEAN, true,

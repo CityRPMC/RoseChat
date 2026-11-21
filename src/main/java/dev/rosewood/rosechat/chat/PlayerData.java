@@ -27,6 +27,9 @@ public class PlayerData {
     private boolean channelSpy;
     private boolean groupSpy;
     private boolean canBeMessaged;
+    private DmPrivacy dmPrivacy;
+    private boolean dnd;
+    private String status;
     private boolean tagSounds;
     private boolean messageSounds;
     private boolean emojis;
@@ -39,6 +42,9 @@ public class PlayerData {
     private String strippedDisplayName;
     private final List<GroupChannel> groupInvites;
     private final List<UUID> ignoringPlayers;
+    private final List<UUID> blockedPlayers;
+    private final List<UUID> friends;
+    private final List<UUID> friendRequests;
     private final List<String> hiddenChannels;
 
     private List<String> chatCompletions;
@@ -55,6 +61,8 @@ public class PlayerData {
         this.uuid = uuid;
         this.messageLog = NMSUtil.isPaper() ? new AdventureMessageLog(uuid) : new PlayerMessageLog(uuid);
         this.canBeMessaged = true;
+        this.dmPrivacy = DmPrivacy.EVERYONE;
+        this.dnd = false;
         this.tagSounds = true;
         this.messageSounds = true;
         this.emojis = true;
@@ -62,6 +70,9 @@ public class PlayerData {
         this.currentChannel = RoseChatAPI.getInstance().getChannelManager().getDefaultChannel();
         this.groupInvites = new ArrayList<>();
         this.ignoringPlayers = new ArrayList<>();
+        this.blockedPlayers = new ArrayList<>();
+        this.friends = new ArrayList<>();
+        this.friendRequests = new ArrayList<>();
         this.hiddenChannels = new ArrayList<>();
         this.chatCompletions = new ArrayList<>();
     }
@@ -148,7 +159,7 @@ public class PlayerData {
      * @return True if the player can be messaged.
      */
     public boolean canBeMessaged() {
-        return this.canBeMessaged;
+        return this.canBeMessaged && this.dmPrivacy != DmPrivacy.NOBODY;
     }
 
     /**
@@ -156,6 +167,32 @@ public class PlayerData {
      */
     public void setCanBeMessaged(boolean canBeMessaged) {
         this.canBeMessaged = canBeMessaged;
+        this.dmPrivacy = canBeMessaged ? DmPrivacy.EVERYONE : DmPrivacy.NOBODY;
+    }
+
+    public DmPrivacy getDmPrivacy() {
+        return this.dmPrivacy;
+    }
+
+    public void setDmPrivacy(DmPrivacy dmPrivacy) {
+        this.dmPrivacy = dmPrivacy == null ? DmPrivacy.EVERYONE : dmPrivacy;
+        this.canBeMessaged = this.dmPrivacy != DmPrivacy.NOBODY;
+    }
+
+    public boolean isDnd() {
+        return this.dnd;
+    }
+
+    public void setDnd(boolean dnd) {
+        this.dnd = dnd;
+    }
+
+    public String getStatus() {
+        return this.status;
+    }
+
+    public void setStatus(String status) {
+        this.status = (status == null || status.isBlank()) ? null : status;
     }
 
     /**
@@ -325,6 +362,77 @@ public class PlayerData {
     public void unignore(UUID target) {
         this.ignoringPlayers.remove(target);
         this.api.getPlayerDataManager().removeIgnore(this.getUUID(), target);
+    }
+
+    public List<UUID> getBlockedPlayers() {
+        return this.blockedPlayers;
+    }
+
+    public boolean isBlocking(UUID target) {
+        return target != null && this.blockedPlayers.contains(target);
+    }
+
+    public void loadBlockedPlayer(UUID target) {
+        if (target != null && !this.blockedPlayers.contains(target))
+            this.blockedPlayers.add(target);
+    }
+
+    public void block(UUID target) {
+        if (target == null || this.blockedPlayers.contains(target))
+            return;
+
+        this.blockedPlayers.add(target);
+        this.api.getPlayerDataManager().addBlock(this.getUUID(), target);
+    }
+
+    public void unblock(UUID target) {
+        this.blockedPlayers.remove(target);
+        this.api.getPlayerDataManager().removeBlock(this.getUUID(), target);
+    }
+
+    public List<UUID> getFriends() {
+        return this.friends;
+    }
+
+    public boolean isFriend(UUID target) {
+        return target != null && this.friends.contains(target);
+    }
+
+    public void loadFriend(UUID target) {
+        if (target != null && !this.friends.contains(target))
+            this.friends.add(target);
+    }
+
+    public void addFriend(UUID target) {
+        if (target == null)
+            return;
+
+        if (!this.friends.contains(target))
+            this.friends.add(target);
+        this.friendRequests.remove(target);
+        this.api.getPlayerDataManager().addFriend(this.getUUID(), target);
+    }
+
+    public void removeFriend(UUID target) {
+        if (target == null)
+            return;
+
+        this.friends.remove(target);
+        this.friendRequests.remove(target);
+        this.api.getPlayerDataManager().removeFriend(this.getUUID(), target);
+    }
+
+    public List<UUID> getFriendRequests() {
+        return this.friendRequests;
+    }
+
+    public void addFriendRequest(UUID requester) {
+        if (requester != null && !this.friendRequests.contains(requester))
+            this.friendRequests.add(requester);
+    }
+
+    public void removeFriendRequest(UUID requester) {
+        this.friendRequests.remove(requester);
     }
 
     /**

@@ -306,6 +306,47 @@ public final class RoseChatAPI {
         this.getPlayerDataManager().getPlayerData(uuid, callback);
     }
 
+    public boolean isBlocking(UUID blocker, UUID target) {
+        if (blocker == null || target == null || blocker.equals(target))
+            return false;
+        PlayerData data = this.getPlayerData(blocker);
+        return data != null && data.isBlocking(target);
+    }
+
+    public boolean isBlocked(UUID a, UUID b) {
+        if (a == null || b == null || a.equals(b))
+            return false;
+        return this.isBlocking(a, b) || this.isBlocking(b, a);
+    }
+
+    public List<UUID> getBlockedPlayers(UUID player) {
+        if (player == null)
+            return java.util.Collections.emptyList();
+        PlayerData data = this.getPlayerData(player);
+        return data == null ? java.util.Collections.emptyList() : java.util.Collections.unmodifiableList(data.getBlockedPlayers());
+    }
+
+    public boolean isIgnoring(UUID ignorer, UUID target) {
+        if (ignorer == null || target == null || ignorer.equals(target))
+            return false;
+        PlayerData data = this.getPlayerData(ignorer);
+        return data != null && data.getIgnoringPlayers().contains(target);
+    }
+
+    public boolean areFriends(UUID a, UUID b) {
+        if (a == null || b == null || a.equals(b))
+            return false;
+        PlayerData data = this.getPlayerData(a);
+        return data != null && data.isFriend(b);
+    }
+
+    public List<UUID> getFriends(UUID player) {
+        if (player == null)
+            return java.util.Collections.emptyList();
+        PlayerData data = this.getPlayerData(player);
+        return data == null ? java.util.Collections.emptyList() : java.util.Collections.unmodifiableList(data.getFriends());
+    }
+
     /**
      * @return An instance of the locale manager.
      */

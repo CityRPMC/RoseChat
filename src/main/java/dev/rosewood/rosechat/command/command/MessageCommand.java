@@ -71,11 +71,24 @@ public class MessageCommand extends RoseChatCommand {
                 }
             }
 
+            if (player.isPlayer() && target != null && target.isPlayer() && !player.hasPermission("rosechat.block.bypass")
+                    && this.getAPI().isBlocked(player.getUUID(), target.getUUID())) {
+                player.sendLocaleMessage("command-block-cannot-message");
+                return;
+            }
+
             if (target != null && !player.hasPermission("rosechat.togglemessage.bypass")) {
                 PlayerData targetData = target.getPlayerData();
-                if (targetData != null && !targetData.canBeMessaged()) {
-                    player.sendLocaleMessage("command-togglemessage-cannot-message");
-                    return;
+                if (targetData != null) {
+                    if (targetData.getDmPrivacy() == dev.rosewood.rosechat.chat.DmPrivacy.NOBODY || !targetData.canBeMessaged()) {
+                        player.sendLocaleMessage("command-togglemessage-cannot-message");
+                        return;
+                    }
+                    if (targetData.getDmPrivacy() == dev.rosewood.rosechat.chat.DmPrivacy.FRIENDS
+                            && (!player.isPlayer() || !targetData.isFriend(player.getUUID()))) {
+                        player.sendLocaleMessage("command-togglemessage-friends-only");
+                        return;
+                    }
                 }
             }
 

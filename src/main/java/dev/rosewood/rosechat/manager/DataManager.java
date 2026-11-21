@@ -1,6 +1,7 @@
 package dev.rosewood.rosechat.manager;
 
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.chat.DmPrivacy;
 import dev.rosewood.rosechat.chat.PlayerData;
 import dev.rosewood.rosechat.chat.channel.Channel;
 import dev.rosewood.rosechat.database.migrations._1_Create_Tables_Data;
@@ -8,6 +9,7 @@ import dev.rosewood.rosechat.database.migrations._2_Create_Table_Hidden_Channels
 import dev.rosewood.rosechat.database.migrations._3_Add_Data_Is_Group_Chat_Column;
 import dev.rosewood.rosechat.database.migrations._4_Add_Data_Stripped_Name;
 import dev.rosewood.rosechat.database.migrations._5_Rename_Table_Muted_Channels;
+import dev.rosewood.rosechat.database.migrations._6_Create_Social_Tables;
 import dev.rosewood.rosechat.hook.channel.rosechat.GroupChannel;
 import dev.rosewood.rosegarden.RosePlugin;
 import dev.rosewood.rosegarden.database.DataMigration;
@@ -35,7 +37,8 @@ public class DataManager extends AbstractDataManager {
                 _2_Create_Table_Hidden_Channels::new,
                 _3_Add_Data_Is_Group_Chat_Column::new,
                 _4_Add_Data_Stripped_Name::new,
-                _5_Rename_Table_Muted_Channels::new
+                _5_Rename_Table_Muted_Channels::new,
+                _6_Create_Social_Tables::new
         );
     }
 
@@ -66,12 +69,21 @@ public class DataManager extends AbstractDataManager {
                     Channel channel = isCurrentlyChannelGroupChannel ?
                             RoseChatAPI.getInstance().getGroupChatById(currentChannel) : channelManager.getChannel(currentChannel);
                     String strippedDisplayName = result.getString("stripped_name");
+                    String rawDmPrivacy = result.getString("dm_privacy");
+                    boolean isDnd = result.getBoolean("is_dnd");
+                    String status = result.getString("status");
 
                     playerData = new PlayerData(uuid);
                     playerData.setMessageSpy(messageSpy);
                     playerData.setChannelSpy(channelSpy);
                     playerData.setGroupSpy(groupSpy);
                     playerData.setCanBeMessaged(canBeMessaged);
+                    DmPrivacy dmPrivacy = DmPrivacy.fromString(rawDmPrivacy);
+                    if (!canBeMessaged && dmPrivacy == DmPrivacy.EVERYONE)
+                        dmPrivacy = DmPrivacy.NOBODY;
+                    playerData.setDmPrivacy(dmPrivacy);
+                    playerData.setDnd(isDnd);
+                    playerData.setStatus(status);
                     playerData.setTagSounds(hasTagSounds);
                     playerData.setMessageSounds(hasMessageSounds);
                     playerData.setEmojis(hasEmojis);
@@ -100,6 +112,28 @@ public class DataManager extends AbstractDataManager {
                 }
             }
 
+            String blockQuery = "SELECT * FROM " + this.getTablePrefix() + "player_data_block WHERE blocking_uuid = ?";
+            try (PreparedStatement statement = connection.prepareStatement(blockQuery)) {
+                statement.setString(1, uuid.toString());
+                ResultSet result = statement.executeQuery();
+
+                while (result.next()) {
+                    UUID blocked = UUID.fromString(result.getString("blocked_uuid"));
+                    playerData.loadBlockedPlayer(blocked);
+                }
+            }
+
+            String friendQuery = "SELECT * FROM " + this.getTablePrefix() + "player_data_friend WHERE player_uuid = ?";
+            try (PreparedStatement statement = connection.prepareStatement(friendQuery)) {
+                statement.setString(1, uuid.toString());
+                ResultSet result = statement.executeQuery();
+
+                while (result.next()) {
+                    UUID friend = UUID.fromString(result.getString("friend_uuid"));
+                    playerData.loadFriend(friend);
+                }
+            }
+
             String channelsQuery = "SELECT * FROM " + this.getTablePrefix() + "hidden_channels WHERE uuid = ?";
             try (PreparedStatement statement = connection.prepareStatement(channelsQuery)) {
                 statement.setString(1, uuid.toString());
@@ -121,8 +155,8 @@ public class DataManager extends AbstractDataManager {
 
             String query = "REPLACE INTO " + this.getTablePrefix() + "player_data (uuid, has_message_spy, has_channel_spy, has_group_spy, " +
                     "can_be_messaged, has_tag_sounds, has_message_sounds, has_emojis, " +
-                    "current_channel, chat_color, mute_time, nickname, is_currently_in_gc, stripped_name) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    "current_channel, chat_color, mute_time, nickname, is_currently_in_gc, stripped_name, dm_privacy, is_dnd, status) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             try (PreparedStatement statement = connection.prepareStatement(query)) {
                 statement.setString(1, playerData.getUUID().toString());
                 statement.setBoolean(2, playerData.hasMessageSpy());
@@ -138,6 +172,9 @@ public class DataManager extends AbstractDataManager {
                 statement.setString(12, playerData.getNickname());
                 statement.setBoolean(13, playerData.isCurrentChannelGroupChannel());
                 statement.setString(14, playerData.getStrippedDisplayName());
+                statement.setString(15, playerData.getDmPrivacy().name());
+                statement.setBoolean(16, playerData.isDnd());
+                statement.setString(17, playerData.getStatus());
                 statement.executeUpdate();
             }
         });
@@ -185,6 +222,77 @@ public class DataManager extends AbstractDataManager {
             try (PreparedStatement statement = connection.prepareStatement(deleteQuery)) {
                 statement.setString(1, ignoring.toString());
                 statement.setString(2, ignored.toString());
+                statement.executeUpdate();
+            }
+        });
+    }
+
+    public void addBlock(UUID blocking, UUID blocked) {
+        this.databaseConnector.connect(connection -> {
+            String checkQuery = "SELECT 1 FROM " + this.getTablePrefix() + "player_data_block WHERE blocking_uuid = ? AND blocked_uuid = ?";
+            try (PreparedStatement checkStatement = connection.prepareStatement(checkQuery)) {
+                checkStatement.setString(1, blocking.toString());
+                checkStatement.setString(2, blocked.toString());
+                if (checkStatement.executeQuery().next())
+                    return;
+            }
+
+            String insertQuery = "INSERT INTO " + this.getTablePrefix() + "player_data_block (blocking_uuid, blocked_uuid, created_at) " +
+                    "VALUES(?, ?, ?)";
+            try (PreparedStatement statement = connection.prepareStatement(insertQuery)) {
+                statement.setString(1, blocking.toString());
+                statement.setString(2, blocked.toString());
+                statement.setLong(3, System.currentTimeMillis());
+                statement.executeUpdate();
+            }
+        });
+    }
+
+    public void removeBlock(UUID blocking, UUID blocked) {
+        this.databaseConnector.connect(connection -> {
+            String deleteQuery = "DELETE FROM " + this.getTablePrefix() + "player_data_block WHERE blocking_uuid = ? AND blocked_uuid = ?";
+            try (PreparedStatement statement = connection.prepareStatement(deleteQuery)) {
+                statement.setString(1, blocking.toString());
+                statement.setString(2, blocked.toString());
+                statement.executeUpdate();
+            }
+        });
+    }
+
+    public void addFriend(UUID player, UUID friend) {
+        this.databaseConnector.connect(connection -> {
+            long now = System.currentTimeMillis();
+            this.insertFriendPair(connection, player, friend, now);
+            this.insertFriendPair(connection, friend, player, now);
+        });
+    }
+
+    private void insertFriendPair(java.sql.Connection connection, UUID player, UUID friend, long timestamp) throws java.sql.SQLException {
+        String checkQuery = "SELECT 1 FROM " + this.getTablePrefix() + "player_data_friend WHERE player_uuid = ? AND friend_uuid = ?";
+        try (PreparedStatement checkStatement = connection.prepareStatement(checkQuery)) {
+            checkStatement.setString(1, player.toString());
+            checkStatement.setString(2, friend.toString());
+            if (checkStatement.executeQuery().next())
+                return;
+        }
+
+        String insertQuery = "INSERT INTO " + this.getTablePrefix() + "player_data_friend (player_uuid, friend_uuid, created_at) VALUES(?, ?, ?)";
+        try (PreparedStatement statement = connection.prepareStatement(insertQuery)) {
+            statement.setString(1, player.toString());
+            statement.setString(2, friend.toString());
+            statement.setLong(3, timestamp);
+            statement.executeUpdate();
+        }
+    }
+
+    public void removeFriend(UUID player, UUID friend) {
+        this.databaseConnector.connect(connection -> {
+            String deleteQuery = "DELETE FROM " + this.getTablePrefix() + "player_data_friend WHERE (player_uuid = ? AND friend_uuid = ?) OR (player_uuid = ? AND friend_uuid = ?)";
+            try (PreparedStatement statement = connection.prepareStatement(deleteQuery)) {
+                statement.setString(1, player.toString());
+                statement.setString(2, friend.toString());
+                statement.setString(3, friend.toString());
+                statement.setString(4, player.toString());
                 statement.executeUpdate();
             }
         });

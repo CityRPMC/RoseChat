@@ -208,8 +208,12 @@ public abstract class Channel {
         if (data.isChannelHidden(this.getId()))
             return false;
 
-        if (sender.getUUID() != null)
+        if (sender.getUUID() != null) {
+            if (receiver.getUUID() != null && RoseChatAPI.getInstance().isBlocked(sender.getUUID(), receiver.getUUID()))
+                return false;
+
             return !data.getIgnoringPlayers().contains(sender.getUUID());
+        }
 
         return true;
     }

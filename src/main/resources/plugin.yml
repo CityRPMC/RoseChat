@@ -61,6 +61,12 @@ permissions:
       rosechat.nickname: true
       rosechat.nickcolor: true
       rosechat.ignore: true
+      rosechat.block: true
+      rosechat.block.bypass: true
+      rosechat.friend: true
+      rosechat.dnd: true
+      rosechat.status: true
+      rosechat.profile: true
       rosechat.deletemessages: true
       rosechat.discordchannel: true
       rosechat.code: true
@@ -339,6 +345,24 @@ permissions:
   rosechat.ignore:
     description: Allows using the ignore command.
     default: op
+  rosechat.block:
+    description: Allows blocking and unblocking other players.
+    default: true
+  rosechat.block.bypass:
+    description: Prevents being blocked by other players and bypasses private message blocks.
+    default: op
+  rosechat.friend:
+    description: Allows using the friend command.
+    default: true
+  rosechat.dnd:
+    description: Allows toggling Do Not Disturb mode.
+    default: true
+  rosechat.status:
+    description: Allows setting a custom social RP status.
+    default: true
+  rosechat.profile:
+    description: Allows viewing player social profiles.
+    default: true
   rosechat.deletemessages:
     description: Allows players to delete messages
     default: op

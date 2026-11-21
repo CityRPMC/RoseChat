@@ -2,10 +2,13 @@ package dev.rosewood.rosechat.manager;
 
 import dev.rosewood.rosechat.command.chat.BaseChatCommand;
 import dev.rosewood.rosechat.command.command.BaseCommand;
+import dev.rosewood.rosechat.command.command.BlockCommand;
+import dev.rosewood.rosechat.command.command.BlocklistCommand;
 import dev.rosewood.rosechat.command.command.BroadcastCommand;
 import dev.rosewood.rosechat.command.command.ChannelCommand;
 import dev.rosewood.rosechat.command.command.ChatColorCommand;
 import dev.rosewood.rosechat.command.command.DeleteMessageCommand;
+import dev.rosewood.rosechat.command.command.DndCommand;
 import dev.rosewood.rosechat.command.command.EmojiCommand;
 import dev.rosewood.rosechat.command.command.IgnoreCommand;
 import dev.rosewood.rosechat.command.command.IgnorelistCommand;
@@ -14,13 +17,17 @@ import dev.rosewood.rosechat.command.command.MuteCommand;
 import dev.rosewood.rosechat.command.command.NickColorCommand;
 import dev.rosewood.rosechat.command.command.NicknameCommand;
 import dev.rosewood.rosechat.command.command.PingCommand;
+import dev.rosewood.rosechat.command.command.ProfileCommand;
 import dev.rosewood.rosechat.command.command.RealnameCommand;
 import dev.rosewood.rosechat.command.command.ReplyCommand;
 import dev.rosewood.rosechat.command.command.SocialSpyCommand;
+import dev.rosewood.rosechat.command.command.StatusCommand;
 import dev.rosewood.rosechat.command.command.ToggleEmojiCommand;
 import dev.rosewood.rosechat.command.command.ToggleMessageCommand;
 import dev.rosewood.rosechat.command.command.ToggleSoundCommand;
+import dev.rosewood.rosechat.command.command.UnblockCommand;
 import dev.rosewood.rosechat.command.command.UnmuteCommand;
+import dev.rosewood.rosechat.command.friend.BaseFriendCommand;
 import dev.rosewood.rosechat.command.group.BaseGroupCommand;
 import dev.rosewood.rosechat.command.group.GroupMessageCommand;
 import dev.rosewood.rosegarden.RosePlugin;
@@ -41,7 +48,12 @@ public class CommandManager extends AbstractCommandManager {
                 BaseCommand::new,
                 BaseChatCommand::new,
                 BaseGroupCommand::new,
+                BaseFriendCommand::new,
+                BlockCommand::new,
+                UnblockCommand::new,
+                BlocklistCommand::new,
                 BroadcastCommand::new,
+                DndCommand::new,
                 GroupMessageCommand::new,
                 ChannelCommand::new,
                 ChatColorCommand::new,
@@ -52,9 +64,11 @@ public class CommandManager extends AbstractCommandManager {
                 MuteCommand::new,
                 NickColorCommand::new,
                 NicknameCommand::new,
+                ProfileCommand::new,
                 RealnameCommand::new,
                 ReplyCommand::new,
                 SocialSpyCommand::new,
+                StatusCommand::new,
                 ToggleEmojiCommand::new,
                 ToggleMessageCommand::new,
                 ToggleSoundCommand::new,
