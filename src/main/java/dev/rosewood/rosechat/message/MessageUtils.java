@@ -208,8 +208,8 @@ public class MessageUtils {
 
         // If the message was sent by a player, check if the receiver is ignoring them.
         if (sender.isPlayer()) {
-            OfflinePlayer offlineTarget = Bukkit.getOfflinePlayer(targetName);
-            PlayerData targetData = RoseChatAPI.getInstance().getPlayerData(offlineTarget.getUniqueId());
+            UUID targetUuid = target != null ? target.getUniqueId() : Bukkit.getOfflinePlayer(targetName).getUniqueId();
+            PlayerData targetData = RoseChatAPI.getInstance().getPlayerData(targetUuid);
 
             if (targetData != null && targetData.getIgnoringPlayers().contains(sender.getUUID())) {
                 sender.sendLocaleMessage("command-togglemessage-cannot-message");

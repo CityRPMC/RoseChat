@@ -63,6 +63,11 @@ public class GroupInviteCommand extends RoseChatCommand {
             return;
         }
 
+        if (target.getPlayerData() != null && target.getPlayerData().getIgnoringPlayers().contains(player.getUUID())) {
+            player.sendLocaleMessage("command-togglemessage-cannot-message");
+            return;
+        }
+
         target.invite(group);
 
         player.sendLocaleMessage("command-gc-invite-success",

@@ -94,9 +94,9 @@ public class DataManager extends AbstractDataManager {
                 statement.setString(1, uuid.toString());
                 ResultSet result = statement.executeQuery();
 
-                if (result.next()) {
+                while (result.next()) {
                     UUID ignored = UUID.fromString(result.getString("ignored_uuid"));
-                    playerData.ignore(ignored);
+                    playerData.loadIgnoredPlayer(ignored);
                 }
             }
 
@@ -105,7 +105,7 @@ public class DataManager extends AbstractDataManager {
                 statement.setString(1, uuid.toString());
                 ResultSet result = statement.executeQuery();
 
-                if (result.next()) {
+                while (result.next()) {
                     playerData.hideChannel(result.getString("channel"));
                 }
             }
@@ -161,6 +161,14 @@ public class DataManager extends AbstractDataManager {
 
     public void addIgnore(UUID ignoring, UUID ignored) {
         this.databaseConnector.connect(connection -> {
+            String checkQuery = "SELECT 1 FROM " + this.getTablePrefix() + "player_data_ignore WHERE ignoring_uuid = ? AND ignored_uuid = ?";
+            try (PreparedStatement checkStatement = connection.prepareStatement(checkQuery)) {
+                checkStatement.setString(1, ignoring.toString());
+                checkStatement.setString(2, ignored.toString());
+                if (checkStatement.executeQuery().next())
+                    return;
+            }
+
             String insertQuery = "INSERT INTO " + this.getTablePrefix() + "player_data_ignore (ignoring_uuid, ignored_uuid) " +
                     "VALUES(?, ?)";
             try (PreparedStatement statement = connection.prepareStatement(insertQuery)) {

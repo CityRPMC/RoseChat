@@ -298,10 +298,22 @@ public class PlayerData {
     }
 
     /**
+     * Loads an ignored player into memory without writing back to the database.
+     * @param target The player to load as ignored.
+     */
+    public void loadIgnoredPlayer(UUID target) {
+        if (target != null && !this.ignoringPlayers.contains(target))
+            this.ignoringPlayers.add(target);
+    }
+
+    /**
      * Ignores a player.
      * @param target The player to ignore.
      */
     public void ignore(UUID target) {
+        if (target == null || this.ignoringPlayers.contains(target))
+            return;
+
         this.ignoringPlayers.add(target);
         this.api.getPlayerDataManager().addIgnore(this.getUUID(), target);
     }

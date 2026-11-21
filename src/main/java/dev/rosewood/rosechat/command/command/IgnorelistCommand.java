@@ -57,7 +57,8 @@ public class IgnorelistCommand extends RoseChatCommand {
                 RosePlayer roseIgnoredPlayer = new RosePlayer(ignoredPlayer);
                 name = roseIgnoredPlayer.getName();
             } else {
-                name = Bukkit.getOfflinePlayer(uuid).getName();
+                String offlineName = Bukkit.getOfflinePlayer(uuid).getName();
+                name = offlineName != null ? offlineName : uuid.toString().substring(0, 8);
             }
 
             if (first) {
