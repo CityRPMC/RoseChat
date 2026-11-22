@@ -10,6 +10,7 @@ import dev.rosewood.rosechat.database.migrations._3_Add_Data_Is_Group_Chat_Colum
 import dev.rosewood.rosechat.database.migrations._4_Add_Data_Stripped_Name;
 import dev.rosewood.rosechat.database.migrations._5_Rename_Table_Muted_Channels;
 import dev.rosewood.rosechat.database.migrations._6_Create_Social_Tables;
+import dev.rosewood.rosechat.database.migrations._7_Deduplicate_Hidden_And_Ignore_Tables;
 import dev.rosewood.rosechat.hook.channel.rosechat.GroupChannel;
 import dev.rosewood.rosegarden.RosePlugin;
 import dev.rosewood.rosegarden.database.DataMigration;
@@ -38,7 +39,8 @@ public class DataManager extends AbstractDataManager {
                 _3_Add_Data_Is_Group_Chat_Column::new,
                 _4_Add_Data_Stripped_Name::new,
                 _5_Rename_Table_Muted_Channels::new,
-                _6_Create_Social_Tables::new
+                _6_Create_Social_Tables::new,
+                _7_Deduplicate_Hidden_And_Ignore_Tables::new
         );
     }
 
@@ -140,7 +142,7 @@ public class DataManager extends AbstractDataManager {
                 ResultSet result = statement.executeQuery();
 
                 while (result.next()) {
-                    playerData.hideChannel(result.getString("channel"));
+                    playerData.loadHiddenChannel(result.getString("channel"));
                 }
             }
 
@@ -300,6 +302,14 @@ public class DataManager extends AbstractDataManager {
 
     public void hideChannel(UUID uuid, String channel) {
         this.databaseConnector.connect(connection -> {
+            String checkQuery = "SELECT 1 FROM " + this.getTablePrefix() + "hidden_channels WHERE uuid = ? AND channel = ?";
+            try (PreparedStatement checkStatement = connection.prepareStatement(checkQuery)) {
+                checkStatement.setString(1, uuid.toString());
+                checkStatement.setString(2, channel);
+                if (checkStatement.executeQuery().next())
+                    return;
+            }
+
             String insertQuery = "INSERT INTO " + this.getTablePrefix() + "hidden_channels (uuid, channel) " +
                     "VALUES(?, ?)";
             try (PreparedStatement statement = connection.prepareStatement(insertQuery)) {

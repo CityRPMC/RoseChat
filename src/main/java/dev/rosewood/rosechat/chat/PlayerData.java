@@ -489,10 +489,22 @@ public class PlayerData {
     }
 
     /**
+     * Loads a hidden channel into memory without writing back to the database.
+     * @param channel The channel to load as hidden.
+     */
+    public void loadHiddenChannel(String channel) {
+        if (channel != null && !this.hiddenChannels.contains(channel))
+            this.hiddenChannels.add(channel);
+    }
+
+    /**
      * Hides a channel from the player.
      * @param channel The channel to hide.
      */
     public void hideChannel(String channel) {
+        if (channel == null || this.hiddenChannels.contains(channel))
+            return;
+
         this.hiddenChannels.add(channel);
         this.api.getPlayerDataManager().hideChannel(this.getUUID(), channel);
     }

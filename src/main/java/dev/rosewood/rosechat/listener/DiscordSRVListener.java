@@ -107,7 +107,7 @@ public class DiscordSRVListener extends ListenerAdapter implements Listener {
 
     @Subscribe(priority = ListenerPriority.LOW)
     public void onDiscordMessagePostProcess(DiscordGuildMessagePostProcessEvent event) {
-        if (!Settings.USE_DISCORD.get())
+        if (!RoseChat.getInstance().isEnabled() || !Settings.USE_DISCORD.get())
             return;
 
         event.setCancelled(true);
